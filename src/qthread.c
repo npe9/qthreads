@@ -945,7 +945,7 @@ int API_FUNC qthread_initialize(void)
     qlib->nworkerspershep   = nworkerspershep;
     qlib->nshepherds_active = nshepherds;
     qlib->shepherds         = (qthread_shepherd_t *)calloc(nshepherds, sizeof(qthread_shepherd_t));
-    qlib->threadqueues      = (qt_threadqueue_t **)MALLOC(nshepherds * sizeof(qt_threadqueue_t *));
+    qlib->threadqueues      = (qt_threadqueue_t **)calloc(nshepherds, sizeof(qt_threadqueue_t *));
 #ifdef QTHREAD_LOCAL_PRIORITY
     qlib->local_priority_queues = (qt_threadqueue_t **)MALLOC(nshepherds * sizeof(qt_threadqueue_t *));
 #endif /* ifdef QTHREAD_LOCAL_PRIORITY */
