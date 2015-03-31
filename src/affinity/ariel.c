@@ -14,6 +14,7 @@ static int * lid_to_tid;
 static int * lid_to_hid;
 static int * lvls;
 int arity;
+int num_lids;
 
 static inline void topo_set_tid_to_lid(int first_lvl,
                                        int second_lvl,
@@ -303,7 +304,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 
         /* Set tid to lid mapping */
         int num_lvls = 3;
-        int num_lids = 1;
+        num_lids = 1;
         lvls = (int *)malloc(sizeof(int) * num_lvls);
         assert(NULL != lvls);
 
