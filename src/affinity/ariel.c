@@ -14,7 +14,6 @@ static int * lid_to_tid;
 static int * lid_to_hid;
 static int * lvls;
 int arity;
-int num_threads;
 
 static inline void topo_set_tid_to_lid(int first_lvl,
                                        int second_lvl,
@@ -84,6 +83,7 @@ void INTERNAL qt_affinity_set(qthread_worker_t *me,
   int tid;
   int cid;
   int err;
+  qthread_worker_id_t num_threads = qthread_readstate(TOTAL_WORKERS);
 
   tid = me->worker_id;
   
@@ -145,12 +145,6 @@ void INTERNAL qt_affinity_set(qthread_worker_t *me,
   cid = hwloc_bitmap_first(set);
   printf("Thread number %d now on %d\n", tid, cid);
   hwloc_bitmap_free(set);
-}
-
-void topo_pin_threads(int n, int a)
-{
-    num_threads = n;
-    arity = a;
 }
 
 void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
@@ -387,14 +381,10 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 # endif
 # ifdef TOPO_COMP
         printf("topo_tid_to_lid: compact\n");
-        
-        /* Pin threads */
-        topo_pin_threads(num_lids, 1);
+        arity = 1;
 # else
         printf("topo_tid_to_lid: bal_comp\n");
-        
-        /* Pin threads */
-        topo_pin_threads(num_lids, lvls[top_lvl]);
+        arity = lvls[top_lvl];
 # endif
 #elif defined(TOPO_SCAT) || defined(TOPO_BAL_SCAT)
         /* Create scatter mapping of lin. thraed id space onto 3D
@@ -412,28 +402,23 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 # endif
 # ifdef TOPO_SCAT
         printf("topo_tid_to_lid: scatter\n");
-
-        /* Pin threads */
-        topo_pin_threads(num_lids, 1);
+        arity = 1;
 # else
         printf("topo_tid_to_lid: bal_scat\n");
-
-        /* Pin threads */
-        topo_pin_threads(num_lids, lvls[top_lvl]);
+        arity = lvls[top_lvl];
 # endif
 #else
 # error "No thread to logical id map specified."
 #endif
 
     }
+
 #if ONETOONE
-    *nbshepherds = num_threads;
+    *nbshepherds = *hw_par;
     *nbworkers = 1;
-    *hw_par = num_threads;
 #else
     *nbshepherds = 1;
-    *nbworkers = num_threads;
-    *hw_par = num_threads;
+    *nbworkers = *hw_par;
 #endif
     return;
 
