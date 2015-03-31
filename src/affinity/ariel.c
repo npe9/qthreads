@@ -162,6 +162,18 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
     unsigned i;
     int err;
 
+#ifdef TOPO_COMP
+    fprintf(stderr, "ariel_topo: compact\n");
+#elif TOPO_SCAT
+    fprintf(stderr, "ariel_topo: scatter\n");
+#elif TOPO_BAL_COMP
+    fprintf(stderr, "ariel_topo: bal_comp\n");
+#elif TOPO_BAL_SCAT
+    fprintf(stderr, "ariel_topo: bal_scat\n");
+#else
+# error "Undefined thread pinning."
+#endif
+
     /* create a topology */
     err = hwloc_topology_init(&topology);
     if (err < 0) {
@@ -304,6 +316,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 
 #ifdef PLAT_CURIE
         /* Curie */
+        fprintf(stderr, "ariel_plat: curie\n");
         top_lvl = 2; // NUMAs
         mid_lvl = 1; // Modules
         bot_lvl = 0; // Cores
@@ -313,6 +326,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
         lvls[bot_lvl] = 2;
 #elif PLAT_MORGAN_HOST
         /* Morgan (host) */
+        fprintf(stderr, "ariel_plat: morgan_host\n");
         top_lvl = 2; // Sockets
         mid_lvl = 1; // Cores
         bot_lvl = 0; // Hyper-threads
@@ -322,6 +336,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
         lvls[bot_lvl] = 2;
 #elif PLAT_MORGAN_PHI
         /* Morgan (phi) */
+        fprintf(stderr, "ariel_plat: morgan_phi\n");
         top_lvl = 2; // Machine
         mid_lvl = 1; // Cores
         bot_lvl = 0; // Hyper-threads
