@@ -147,8 +147,11 @@ void INTERNAL qt_affinity_set(qthread_worker_t *me,
   hwloc_bitmap_free(set);
 }
 
-void topo_pin_threads(int n, int a){num_threads = n; arity = a;};
-
+void topo_pin_threads(int n, int a)
+{
+    num_threads = n;
+    arity = a;
+}
 
 void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
                                qthread_worker_id_t   *nbworkers,
