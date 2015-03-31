@@ -1,20 +1,12 @@
-# include <stdio.h>
-# include <stdlib.h>
-# include <unistd.h>
-# include <math.h>
-# include <float.h>
-# include <limits.h>
-# include <sys/time.h>
-# include <hwloc.h>
-# include <string.h>
-# include <errno.h>
-# include <qthread.h>
-# include <qt_visibility.h>
+#include <hwloc.h>
+
 #include "qt_subsystems.h"
 #include "qt_asserts.h" /* for qassert() */
 #include "qt_affinity.h"
 #include "qt_debug.h"
 #include "qt_envariables.h"
+#include "qt_output_macros.h"
+#include "shufflesheps.h"
 
 static hwloc_topology_t topology;
 static int * tid_to_lid;
