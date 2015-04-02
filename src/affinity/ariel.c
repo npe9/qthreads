@@ -8,12 +8,18 @@
 #include "qt_output_macros.h"
 #include "shufflesheps.h"
 
+
 static hwloc_topology_t topology;
 static int * tid_to_lid;
 static int * lid_to_tid;
 static int * lid_to_hid;
 static int * lvls;
 int arity;
+struct {
+  hwloc_cpuset_t* binds;
+  int num;
+} shep;
+int * sheps_to_workers;
 
 static inline void topo_set_tid_to_lid(int first_lvl,
                                        int second_lvl,
@@ -69,6 +75,22 @@ static inline void topo_set_lid_to_hid(int first_lvl,
         }
     }
 }
+
+int INTERNAL getTid(int hid, int num_pu, int hw_par){
+  int lid = -1, i;
+  int tid = -1;
+  for(i=0; i<num_pu; i++) if (lid_to_hid[i] == hid) {
+    lid = i;
+    break;
+  }
+  printf("lid %d\n", lid);
+  for(i=0; i<hw_par; i++) if (tid_to_lid[i] == lid) {
+    tid = i;
+    break;
+  }
+  return tid;
+}
+
 
 void INTERNAL qt_affinity_free(void  *ptr,
                                size_t bytes)
@@ -157,7 +179,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
     char *buffer;
     char type[64];
     unsigned i;
-    int err;
+    int err, num_pus, num_lids;
 
 #ifdef TOPO_COMP
     fprintf(stderr, "ariel_topo: compact\n");
@@ -291,7 +313,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
     }
 
     {
-        int num_pus = hwloc_bitmap_weight(cset_available);
+        num_pus = hwloc_bitmap_weight(cset_available);
         printf("num_pus: %d\n", num_pus);
 
         tid_to_lid = (int *)malloc(sizeof(int) * num_pus);
@@ -303,7 +325,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 
         /* Set tid to lid mapping */
         int num_lvls = 3;
-        int num_lids = 1;
+        num_lids = 1;
         lvls = (int *)malloc(sizeof(int) * num_lvls);
         assert(NULL != lvls);
 
@@ -318,8 +340,8 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
         mid_lvl = 1; // Modules
         bot_lvl = 0; // Cores
 
-        lvls[top_lvl] = 2;
-        lvls[mid_lvl] = 4;
+        lvls[top_lvl] = 1;
+        lvls[mid_lvl] = 1;
         lvls[bot_lvl] = 2;
 #elif PLAT_MORGAN_HOST
         /* Morgan (host) */
@@ -413,13 +435,58 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 
     }
 
-#if ONETOONE
-    *nbshepherds = *hw_par;
-    *nbworkers = 1;
-#else
-    *nbshepherds = 1;
-    *nbworkers = *hw_par;
-#endif
+    const char *bindstr = qt_internal_get_env_str("CPUBIND", "NOT_SET");
+    char *bstr = malloc(strlen(bindstr));
+    const char *hwparstr = qt_internal_get_env_str("HWPAR", "1");
+
+    if(hwparstr){
+      *hw_par = atoi(hwparstr);
+    } else {
+      *hw_par = 1;
+    }
+    strcpy(bstr,bindstr);
+    int j;
+    shep.num = 1; 
+    i = 0;
+    while(bstr[i] != 0){
+      if(bstr[i] == ':') shep.num ++;
+      i++;
+    }
+    char ** ranges = malloc(sizeof(char**) * shep.num);
+    j = 0;
+    ranges[j++] = bstr; 
+    for(i=0; bstr[i] != 0; i++){
+      if(bstr[i] == ':'){
+        bstr[i] = 0;
+        ranges[j++] = bstr+i+1;
+      }
+    }
+    shep.binds = malloc(sizeof(hwloc_cpuset_t) * shep.num);
+    
+    for(i=0; i<shep.num; i++){
+      char tmp[256];
+      shep.binds[i] = hwloc_bitmap_alloc();
+      hwloc_bitmap_list_sscanf(shep.binds[i], ranges[i]);
+      hwloc_bitmap_list_snprintf(tmp, 256, shep.binds[i]);
+      printf("Setting shep %d to cpus %s\n", i, tmp);
+    }
+
+    int id;
+    sheps_to_workers = malloc(sizeof(int) * *hw_par);
+    for(i=0; i<shep.num; i++){
+      int j = 0, id;
+      hwloc_bitmap_foreach_begin(id, shep.binds[i])
+        int tid = getTid(id, num_lids, *hw_par);
+        printf("getTid(%d, %d) = %d\n", id, num_lids, tid);
+        if(tid >= 0){
+          sheps_to_workers[i * *hw_par + j++] = tid;
+          printf("Setting worker %d to shep %d\n", tid, i);
+        }
+      hwloc_bitmap_foreach_end();
+    }
+
+    *nbshepherds = shep.num;
+    *nbworkers = *hw_par / *nbshepherds;
     return;
 
 }
