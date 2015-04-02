@@ -20,6 +20,7 @@ struct {
   int num;
 } shep;
 int * sheps_to_workers;
+int num_lids;
 
 static inline void topo_set_tid_to_lid(int first_lvl,
                                        int second_lvl,
