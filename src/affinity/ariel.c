@@ -342,7 +342,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
         bot_lvl = 0; // Cores
 
         lvls[top_lvl] = 1;
-        lvls[mid_lvl] = 1;
+        lvls[mid_lvl] = 2;
         lvls[bot_lvl] = 2;
 #elif PLAT_MORGAN_HOST
         /* Morgan (host) */
@@ -437,14 +437,18 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
     }
 
     const char *bindstr = qt_internal_get_env_str("CPUBIND", "NOT_SET");
-    char *bstr = malloc(strlen(bindstr));
-    const char *hwparstr = qt_internal_get_env_str("HWPAR", "1");
-
-    if(hwparstr){
-      *hw_par = atoi(hwparstr);
-    } else {
-      *hw_par = 1;
+    if(!bindstr || strcmp(bindstr, "NOT_SET") == 0){
+      printf("failed to read cpubind, did you set QT_CPUBIND?\n");
+      exit(-1);
     }
+    char *bstr = malloc(strlen(bindstr));
+    const char *hwparstr = qt_internal_get_env_str("HWPAR", "NOT_SET");
+    if(!hwparstr || strcmp(hwparstr, "NOT_SET") == 0){
+      printf("failed to read hwpar, did you set QT_HWPAR?\n");
+      exit(-1);
+    }
+    *hw_par = atoi(hwparstr);
+
     strcpy(bstr,bindstr);
     int j;
     shep.num = 1; 
@@ -478,7 +482,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
       int j = 0, id;
       hwloc_bitmap_foreach_begin(id, shep.binds[i])
         int tid = getTid(id, num_lids, *hw_par);
-        printf("getTid(%d, %d) = %d\n", id, num_lids, tid);
+        printf("getTid(%d, %d, %d) = %d\n", id, num_lids, *hw_par, tid);
         if(tid >= 0){
           sheps_to_workers[i * *hw_par + j++] = tid;
           printf("Setting worker %d to shep %d\n", tid, i);
