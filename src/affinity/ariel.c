@@ -341,8 +341,8 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
         mid_lvl = 1; // Modules
         bot_lvl = 0; // Cores
 
-        lvls[top_lvl] = 1;
-        lvls[mid_lvl] = 2;
+        lvls[top_lvl] = 2;
+        lvls[mid_lvl] = 4;
         lvls[bot_lvl] = 2;
 #elif PLAT_MORGAN_HOST
         /* Morgan (host) */
