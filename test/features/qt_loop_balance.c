@@ -14,7 +14,9 @@ static void sum(const size_t startat,
                 const size_t stopat,
                 void        *arg_)
 {
-    qthread_incr(&threads, stopat - startat);
+    for (int i = startat; i < stopat; i++) {
+        qthread_incr(&threads, 1);
+    }
 }
 
 int main(int   argc,
