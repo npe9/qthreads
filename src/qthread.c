@@ -868,6 +868,22 @@ int API_FUNC qthread_initialize_agg(int(*agg_cost) (int count, qthread_f* f, voi
     return r;
 }
 
+static inline void print_config_info(uint_fast8_t const print_info) {
+    if (print_info) {
+#ifdef QTHREAD_USE_SPAWNCACHE
+        print_status("Spawn cache: enabled\n");
+#else
+        print_status("Spawn cache: disabled\n");
+#endif
+#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
+        print_status("Condwait queue: enabled\n");
+#else
+        print_status("Condwait queue: disabled\n");
+#endif
+    }
+
+}
+
 int API_FUNC qthread_initialize(void)
 {                      /*{{{ */
     int                   r;
@@ -880,6 +896,7 @@ int API_FUNC qthread_initialize(void)
     extern unsigned int QTHREAD_LOCKING_STRIPES;
 
     print_info = qt_internal_get_env_num("INFO", 0, 1);
+    print_config_info(print_info);
 
     QTHREAD_FASTLOCK_SETUP();
 #ifdef QTHREAD_DEBUG
