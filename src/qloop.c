@@ -4,6 +4,7 @@
 
 /* System Headers */
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Installed Headers */
 #include <qthread/qthread.h>
@@ -645,7 +646,20 @@ void API_FUNC qt_loop_balance(const size_t    start,
                               const qt_loop_f func,
                               void           *argptr)
 {                                      /*{{{ */
+    printf("Start:%lu, Stop:%lu\n", start, stop);
+#ifdef LOOP_BALANCE_PROFILE
+    qtimer_t time_loop_balance_start = qtimer_create();
+    qtimer_start(time_loop_balance_start);
+    printf("time_loop_balance: start: %f\n", qtimer_wtime());
+#endif
     qt_loop_balance_inner(start, stop, func, argptr, 0, DONECOUNT);
+#ifdef LOOP_BALANCE_PROFILE
+    qtimer_stop(time_loop_balance_start);
+    double secs = qtimer_secs(time_loop_balance_start);
+    printf("time_loop_balance: stop: %f\n", qtimer_wtime());
+    printf("time_loop_balance: total: %f\n", secs);
+    qtimer_destroy(time_loop_balance_start);
+#endif
 }                                      /*}}} */
 
 void API_FUNC qt_loop_balance_simple(const size_t    start,
