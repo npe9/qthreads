@@ -45,6 +45,11 @@ struct _qt_threadqueue {
 #endif
 } /* qt_threadqueue_t */;
 
+void INTERNAL qt_threadqueue_print_status(void)
+{
+    print_status("Scheduler: lifo\n");
+}
+
 /* Memory Management */
 #if defined(UNPOOLED_QUEUES) || defined(UNPOOLED)
 # define ALLOC_THREADQUEUE() (qt_threadqueue_t *)MALLOC(sizeof(qt_threadqueue_t))

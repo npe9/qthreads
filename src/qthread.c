@@ -870,6 +870,7 @@ int API_FUNC qthread_initialize_agg(int(*agg_cost) (int count, qthread_f* f, voi
 
 static inline void print_config_info(uint_fast8_t const print_info) {
     if (print_info) {
+        qt_threadqueue_print_status();
 #ifdef QTHREAD_USE_SPAWNCACHE
         print_status("Spawn cache: enabled\n");
 #else
