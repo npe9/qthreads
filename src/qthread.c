@@ -1142,8 +1142,7 @@ int API_FUNC qthread_initialize(void)
     QTHREAD_CASLOCK_INIT(qlib->shepherds[0].workers[0].active, 1);
     qthread_debug(CORE_DETAILS, "initialized caslock 0,0 %p\n", &qlib->shepherds[0].workers[0].active);
     qlib->shepherds[0].workers[0].worker_id = 0;
-    qlib->shepherds[0].workers[0].unique_id = qthread_internal_incr(&(qlib->max_unique_id),
-                                                                    &qlib->max_unique_id_lock, 1);
+    qlib->shepherds[0].workers[0].unique_id = qt_get_unique_id(0); 
     qthread_makecontext(&(qlib->master_context), qlib->master_stack,
                         qlib->master_stack_size,
 #ifdef QTHREAD_MAKECONTEXT_SPLIT
@@ -1206,8 +1205,10 @@ int API_FUNC qthread_initialize(void)
             }
             qlib->shepherds[i].workers[j].shepherd  = &qlib->shepherds[i];
             qlib->shepherds[i].workers[j].worker_id = j;
-            qlib->shepherds[i].workers[j].unique_id = qthread_internal_incr(&(qlib->max_unique_id),
-                                                                            &qlib->max_unique_id_lock, 1);
+            qlib->shepherds[i].workers[j].unique_id = qt_get_unique_id(j + (i * nworkerspershep));
+            if (print_info){
+              print_status("shep %d, worker %d, unique id[%d]=%d\n", i, j, j + (i * nworkerspershep), qlib->shepherds[i].workers[j].unique_id);
+            }
             qlib->shepherds[i].workers[j].packed_worker_id = j + (i * nworkerspershep);
 
             if ((j * nshepherds) + i + 1 > hw_par) {
@@ -1972,7 +1973,7 @@ size_t API_FUNC qthread_readstate(const enum introspective_state type)
             {
                 qthread_worker_t *worker = (qthread_worker_t *)TLS_GET(shepherd_structs);
 
-                return worker ? (worker->unique_id - 1) : NO_WORKER;
+                return worker ? worker->unique_id : NO_WORKER;
             }
 
         case CURRENT_TEAM:
