@@ -77,6 +77,7 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
 #ifdef LOOP_BALANCE_PROFILE
     size_t const     this_level  = level;
     size_t const     this_my_id  = my_id;
+    size_t const     this_unique_worker_id = qthread_readstate(CURRENT_UNIQUE_WORKER);
 #endif
 
     switch (sync_type) {
@@ -138,14 +139,14 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
     }
 
 #ifdef LOOP_BALANCE_PROFILE
-    printf("time_loop_balance: chunk start: this_level %lu this_my_id %lu startat %lu stopat %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, qtimer_wtime());
+    printf("time_loop_balance: chunk start: this_level %lu this_my_id %lu startat %lu stopat %lu this_unique_worker_id %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, this_unique_worker_id, qtimer_wtime());
 #endif
 
     // and now, we execute the function
     arg->func(arg->startat, arg->stopat, arg->arg);
 
 #ifdef LOOP_BALANCE_PROFILE
-    printf("time_loop_balance: chunk stop: this_level %lu this_my_id %lu startat %lu stopat %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, qtimer_wtime());
+    printf("time_loop_balance: chunk stop: this_level %lu this_my_id %lu startat %lu stopat %lu this_unique_worker_id %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, this_unique_worker_id, qtimer_wtime());
 #endif
 
     switch (sync_type) {
