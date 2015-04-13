@@ -40,6 +40,11 @@ struct qthread_worker_s {
     struct qthread_s        **nostealbuffer;
     struct qthread_s        **stealbuffer;
     qthread_t                *current;
+    // `unique_id`:        some value in [0,HWPAR) non-necessarily-deterministically
+    //                     assigned; not shared by another worker
+    // `worker_id`:        offset in shep's worker array
+    // `packed_worker_id`: offset in 2-D (shep)x(worker) domain, equal to 
+    //                     "shep_id * num_workers_per_shep + worker_id"
     qthread_worker_id_t       unique_id;
     qthread_worker_id_t       worker_id;
     qthread_worker_id_t       packed_worker_id;
