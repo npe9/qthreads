@@ -903,6 +903,16 @@ static inline void print_config_info(uint_fast8_t const print_info) {
 
 }
 
+static inline void print_envvar_info(uint_fast8_t const print_info) {
+    if (print_info) {
+        if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+            print_status("Wait for workers: enabled\n");
+        } else {
+            print_status("Wait for workers: disabled\n");
+        }
+    }
+}
+
 int API_FUNC qthread_initialize(void)
 {                      /*{{{ */
     int                   r;
@@ -916,6 +926,7 @@ int API_FUNC qthread_initialize(void)
 
     print_info = qt_internal_get_env_num("INFO", 0, 1);
     print_config_info(print_info);
+    print_envvar_info(print_info);
 
     QTHREAD_FASTLOCK_SETUP();
 #ifdef QTHREAD_DEBUG
