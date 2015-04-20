@@ -42,6 +42,7 @@
 #if (defined(QTHREAD_SHEPHERD_PROFILING) || defined(QTHREAD_FEB_PROFILING))
 # include "qthread/qtimer.h"
 #endif
+#include "qthread/qtimer.h"
 #include "qthread/barrier.h"
 
 /******************************************************/
@@ -114,6 +115,8 @@ extern int                   powerOff;
 qlib_t qlib      = NULL;
 int    qaffinity = 1;
 QTHREAD_FASTLOCK_ATTRVAR;
+
+aligned_t barrier_for_workers = 0;
 
 struct qt_cleanup_funcs_s {
     void                       (*func)(void);
@@ -491,6 +494,21 @@ static void *qthread_master(void *arg)
     assert(localpriorityqueue);
 #endif /* ifdef QTHREAD_LOCAL_PRIORITY */
     assert(threadqueue);
+
+    // Skip this for the first worker, since it will enter the barrier after
+    // spawning the other workers
+    if (!(1 == me_worker->unique_id)) {
+        if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+            // Wait for all workers to be ready to enter work loop
+            qthread_incr64(&barrier_for_workers, -1);
+            while (0 != qthread_cas(&barrier_for_workers, 0, 0)) {
+                SPINLOCK_BODY();
+            }
+        }
+#ifdef WORKER_START_PROFILE
+        printf("Worker %d started at %f\n", me_worker->unique_id, qtimer_wtime());
+#endif
+    }
 
     while (!done) {
 #ifdef QTHREAD_SHEPHERD_PROFILING
@@ -1200,6 +1218,10 @@ int API_FUNC qthread_initialize(void)
     qlib->nworkers_active = hw_par;
 # endif /* ifdef QTHREAD_RCRTOOL */
 
+    if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+        // Set up barrier for all workers
+        qthread_incr64(&barrier_for_workers, nshepherds * nworkerspershep);
+    }
 /* spawn the shepherds */
     for (i = 0; i < nshepherds; ++i) {
         qthread_worker_id_t j;
@@ -1280,6 +1302,17 @@ int API_FUNC qthread_initialize(void)
     if (NULL != qt_internal_get_env_str("MULTINODE", NULL)) {
         qthread_multinode_initialize();
     }
+#endif
+
+    if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+        // Wait for all workers to be ready to enter work loop
+        qthread_incr64(&barrier_for_workers, -1);
+        while (0 != qthread_cas(&barrier_for_workers, 0, 0)) {
+            SPINLOCK_BODY();
+        }
+    }
+#ifdef WORKER_START_PROFILE
+    printf("Worker %d started at %f\n", 0, qtimer_wtime());
 #endif
 
     qthread_debug(CORE_DETAILS, "finished.\n");

@@ -258,6 +258,9 @@ AC_ARG_ENABLE([profiling],
                    spr)
                      enable_spr_profiling=yes
                      ;;
+                   worker_start)
+                     enable_worker_start_profiling=yes
+                     ;;
                    chapel)
                      enable_chapel_profiling=yes
                      ;;
@@ -887,6 +890,10 @@ AS_IF([test "x$enable_hardware_atomics" = "xno"],
 AS_IF([test "x$enable_loop_balance_profiling" = xyes],
       [AC_DEFINE([LOOP_BALANCE_PROFILE], [1], [Support dynamic profile of qt_loop_balance infomation])],
       [enable_loop_balance_profiling="no"])
+
+AS_IF([test "x$enable_worker_start_profiling" = xyes],
+      [AC_DEFINE([WORKER_START_PROFILE], [1], [Support dynamic profile of worker start up infomation])],
+      [enable_worker_start_profiling="no"])
 
 AS_IF([test "x$enable_steal_profiling" = xyes],
       [AC_DEFINE([STEAL_PROFILE], [1], [Support dynamic profile of steal infomation])],
