@@ -8,6 +8,7 @@
 #include "qt_qthread_t.h" /* for qthread_t */
 #include "qt_mpool.h"
 #include "qt_filters.h"
+#include "qt_output_macros.h"
 
 typedef filter_code (*qt_threadqueue_filter_f)(qthread_t *);
 
@@ -20,6 +21,7 @@ typedef struct _qt_threadqueue_pools {
 #include "qt_spawncache.h"
 
 void INTERNAL qt_threadqueue_subsystem_init(void);
+void INTERNAL qt_threadqueue_print_status(void);
 
 qt_threadqueue_t INTERNAL *qt_threadqueue_new(void);
 void INTERNAL              qt_threadqueue_free(qt_threadqueue_t *q);

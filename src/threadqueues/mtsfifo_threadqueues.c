@@ -61,6 +61,11 @@ static void FREE_TQNODE(void *p)
     qthread_internal_aligned_free(p, 16);
 }
 
+void INTERNAL qt_threadqueue_print_status(void)
+{
+    print_status("Scheduler: mtsfifo\n");
+}
+
 void INTERNAL qt_threadqueue_subsystem_init(void) {}
 #else /* if defined(UNPOOLED_QUEUES) || defined(UNPOOLED) */
 qt_threadqueue_pools_t generic_threadqueue_pools;

@@ -215,20 +215,20 @@ AC_ARG_ENABLE([profiling],
               [AS_HELP_STRING([--enable-profiling=[[areas]]],
                               [turn on the specified comma-separated types of
                                profiling. Available types are: shepherd, lock,
-                               steal, cas_steal, threadc, sincs, teams, spr, and
-                               chapel. Shepherd profiling counts the wall-clock 
-                               time that each shepherd spends idle. FEB
-                               profiling counts the time spent waiting for FEB 
-                               states. Steal profiling counts the amount of 
-                               workstealing that was done. Cas_steal profiling 
-                               counts how many CAS failures happen in 
-                               nottingham steal operations. Threadc counts the 
-                               number of threads spawned and the number of 
-                               threads available to run concurrently. Sincs 
-                               profiling reports sinc counter usage data. Teams
-                               profiling reports team counter usage data. SPR
-                               profiling reports communication information. 
-                               Chapel profiling reports Chapel interface usage.])],
+                               loop_balance, steal, cas_steal, threadc, sincs,
+                               teams, spr, and chapel. Shepherd profiling counts
+                               the wall-clock time that each shepherd spends
+                               idle. FEB profiling counts the time spent waiting
+                               for FEB states. Steal profiling counts the amount
+                               of workstealing that was done. Cas_steal profiling
+                               counts how many CAS failures happen in nottingham
+                               steal operations. Threadc counts the number of
+                               threads spawned and the number of threads available
+                               to run concurrently. Sincs profiling reports sinc
+                               counter usage data. Teams profiling reports team
+                               counter usage data. SPR profiling reports communication
+                               information.  Chapel profiling reports Chapel
+                               interface usage.])],
               [for area in $(echo "$enable_profiling" | sed 's/,/ /g') ; do
                  case "$area" in
                    shepherd|shepherds)
@@ -236,6 +236,9 @@ AC_ARG_ENABLE([profiling],
                      ;;
                    feb|FEB|febs|FEBs|lock|locks)
                      enable_feb_profiling=yes
+                     ;;
+                   loop_balance)
+                     enable_loop_balance_profiling=yes
                      ;;
                    steal)
                      enable_steal_profiling=yes
@@ -254,6 +257,9 @@ AC_ARG_ENABLE([profiling],
                      ;;
                    spr)
                      enable_spr_profiling=yes
+                     ;;
+                   worker_start)
+                     enable_worker_start_profiling=yes
                      ;;
                    chapel)
                      enable_chapel_profiling=yes
@@ -301,12 +307,12 @@ AC_ARG_ENABLE([64bit-alignment],
 AC_ARG_WITH([topology],
             [AS_HELP_STRING([--with-topology=[[topologylib]]],
                             [specify which topology interface to use. Supported
-                             interfaces include hwloc, hwloc_v2, lgrp, libnuma,
-                             libnumaV2, mach, plpa, sys, and, tilera.])],
+                             interfaces include hwloc, hwloc_v2, ariel, lgrp,
+                             libnuma, libnumaV2, mach, plpa, sys, and, tilera.])],
             [AS_IF([test "x$with_topology" = xyes],
                    [with_topology=none_specified])
              case "$with_topology" in
-                 hwloc|hwloc_v2|lgrp|libnuma|libnumaV2|mach|no|plpa|sys|tilera) ;;
+                 hwloc|hwloc_v2|ariel|lgrp|libnuma|libnumaV2|mach|no|plpa|sys|tilera) ;;
                  none_specified) ;;
                  *)
                  AC_MSG_ERROR([Unsupported topology library ($with_topology)])
@@ -881,6 +887,14 @@ AS_IF([test "x$enable_hardware_atomics" = "xno"],
        AS_IF([test "x$enable_internal_spinlock" = xyes],
              [AC_DEFINE([USE_INTERNAL_SPINLOCK], [1], [Use Porterfield spinlock])])])
 
+AS_IF([test "x$enable_loop_balance_profiling" = xyes],
+      [AC_DEFINE([LOOP_BALANCE_PROFILE], [1], [Support dynamic profile of qt_loop_balance infomation])],
+      [enable_loop_balance_profiling="no"])
+
+AS_IF([test "x$enable_worker_start_profiling" = xyes],
+      [AC_DEFINE([WORKER_START_PROFILE], [1], [Support dynamic profile of worker start up infomation])],
+      [enable_worker_start_profiling="no"])
+
 AS_IF([test "x$enable_steal_profiling" = xyes],
       [AC_DEFINE([STEAL_PROFILE], [1], [Support dynamic profile of steal infomation])],
       [enable_steal_profiling="no"])
@@ -1068,8 +1082,8 @@ AS_IF([test "x$qthread_topo" != xno],
       [AS_IF([test "x$qthread_topo" = "xnone_specified"],
              [qthread_topo=no])
        # First, check for hwloc, since it gives me the most portable/flexible/reliable/detailed information.
-       AS_IF([test "x$qthread_topo" = xno -o "x$qthread_topo" = xhwloc -o "x$qthread_topo" = xhwloc_v2],
-             [QTHREAD_CHECK_HWLOC([AS_IF([test "x$qthread_topo" != xhwloc -a "x$qthread_topo" != xhwloc_v2],
+       AS_IF([test "x$qthread_topo" = xno -o "x$qthread_topo" = xhwloc -o "x$qthread_topo" = xhwloc_v2 -o "x$qthread_topo" = xariel],
+             [QTHREAD_CHECK_HWLOC([AS_IF([test "x$qthread_topo" != xhwloc -a "x$qthread_topo" != xhwloc_v2 -a "x$qthread_topo" != xariel],
                                          [qthread_topo=hwloc])],
                                   [AS_IF([test "x$qthread_topo" != xno],
                                          [AC_MSG_ERROR([Specified topology library ($qthread_topo) does not work.])])])])
