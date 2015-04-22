@@ -899,8 +899,14 @@ static inline void print_config_info(uint_fast8_t const print_info) {
 #else
         print_status("Condwait queue: disabled\n");
 #endif
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+        if (qt_internal_get_env_num("LOOP_BALANCE_BARRIER", 1, 0)) {
+            print_status("Loop balance barrier: enabled\n");
+        } else {
+            print_status("Loop balance barrier: disabled\n");
+        }
+#endif
     }
-
 }
 
 int API_FUNC qthread_initialize(void)

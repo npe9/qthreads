@@ -32,6 +32,7 @@ int64_t maestro_size(void);
 #endif
 
 #ifdef USING_QT_LOOP_BALANCE_BARRIER
+# include "qt_envariables.h"
 # include "qt_atomics.h"
 #endif
 
@@ -151,10 +152,12 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
     }
 
 #ifdef USING_QT_LOOP_BALANCE_BARRIER
-    // Barrier before doing work
-    qthread_incr64(loop_barrier, -1);
-    while (0 != qthread_cas(loop_barrier, 0, 0)) {
-        SPINLOCK_BODY();
+    if (NULL != loop_barrier) {
+        // Barrier before doing work
+        qthread_incr64(loop_barrier, -1);
+        while (0 != qthread_cas(loop_barrier, 0, 0)) {
+            SPINLOCK_BODY();
+        }
     }
 #endif
 
@@ -608,7 +611,11 @@ static QINLINE void qt_loop_balance_inner(const size_t       start,
         qwa[i].spawnthreads = maxworkers;
         qwa[i].sync_type    = sync_type;
 #ifdef USING_QT_LOOP_BALANCE_BARRIER
-        qwa[i].loop_barrier = &loop_barrier;
+        if (qt_internal_get_env_num("LOOP_BALANCE_BARRIER", 1, 0)) {
+            qwa[i].loop_barrier = &loop_barrier;
+        } else {
+            qwa[i].loop_barrier = NULL;
+        }
 #endif
         switch (sync_type) {
             case SYNCVAR_T:
