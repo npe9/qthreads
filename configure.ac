@@ -381,6 +381,10 @@ AC_ARG_ENABLE([log-barrier],
               [AC_MSG_WARN([Deprecated option; use --with-barrier=log])
                with_barrier="log"])
 
+AC_ARG_ENABLE([loop_balance_barrier],
+              [AS_HELP_STRING([--enable-loop-balance-barrier],
+                              [Enable chunk-level barrier for qt_loop_balance(). Use QT_LOOP_BALANCE_BARRIER=0 to turn off barrier at run time.])])
+
 AC_ARG_ENABLE([omp_affinity],
               [AS_HELP_STRING([--enable-omp-affinity],
                               [Enable experimental OpenMP affinity extensions (part of ROSE interface). Under development])])
@@ -945,6 +949,10 @@ esac
 AS_IF([test "x$enable_omp_affinity" = xyes],
       [AC_DEFINE([QTHREAD_OMP_AFFINITY], [1], [Enable experimental OpenMP affinity extensions. Under development])],
       [enable_omp_affinity="no"])
+
+AS_IF([test "x$enable_loop_balance_barrier" = xyes],
+      [AC_DEFINE([USING_QT_LOOP_BALANCE_BARRIER], [1], [Enable chunk-level barrier for qt_loop_balance(). Use QT_LOOP_BALANCE_BARRIER=0 to turn off barrier at run time.])],
+      [enable_loop_balance_barrier="no"])
 
 AS_IF([test "x$enable_paranoia" == "xyes"],
       [AC_DEFINE([QTHREAD_PARANOIA], [1], [expensive sanity checks])

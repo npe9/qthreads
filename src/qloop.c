@@ -31,8 +31,6 @@
 int64_t maestro_size(void);
 #endif
 
-#define USING_QT_LOOP_BALANCE_BARRIER 1
-
 #ifdef USING_QT_LOOP_BALANCE_BARRIER
 # include "qt_atomics.h"
 #endif
