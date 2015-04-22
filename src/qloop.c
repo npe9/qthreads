@@ -24,13 +24,20 @@
 
 #ifdef QTHREAD_USE_ROSE_EXTENSIONS
 # include <stdio.h>
-# include "qt_atomics.h"
 # include "qt_threadqueues.h" // for qthread_steal_disable
 #endif
 
 #ifdef QTHREAD_RCRTOOL
 int64_t maestro_size(void);
 #endif
+
+#define USING_QT_LOOP_BALANCE_BARRIER 1
+
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+# include "qt_atomics.h"
+#endif
+
+aligned_t qloop_wrapper_barrier = 0;
 
 typedef enum {
     ALIGNED,
@@ -55,6 +62,9 @@ struct qloop_wrapper_args {
     synctype_t sync_type;
     unsigned   spawn_flags;
     void      *sync;
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    aligned_t *loop_barrier;
+#endif
 };
 
 static QINLINE void qt_loop_balance_inner(const size_t       start,
@@ -73,7 +83,11 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
     size_t           new_id      = my_id + (1 << level);
     const synctype_t sync_type   = arg->sync_type;
     void *const      sync        = arg->sync;
-    
+
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    aligned_t      * loop_barrier = arg->loop_barrier;
+#endif
+
 #ifdef LOOP_BALANCE_PROFILE
     size_t const     this_level  = level;
     size_t const     this_my_id  = my_id;
@@ -137,6 +151,14 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
                 new_id = (1 << level) + my_id;         // level has been incremented
             }
     }
+
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    // Barrier before doing work
+    qthread_incr64(loop_barrier, -1);
+    while (0 != qthread_cas(loop_barrier, 0, 0)) {
+        SPINLOCK_BODY();
+    }
+#endif
 
 #ifdef LOOP_BALANCE_PROFILE
     printf("time_loop_balance: chunk start: this_level %lu this_my_id %lu startat %lu stopat %lu this_unique_worker_id %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, this_unique_worker_id, qtimer_wtime());
@@ -534,6 +556,10 @@ static QINLINE void qt_loop_balance_inner(const size_t       start,
     size_t                           iterend        = start;
     unsigned                         internal_flags = 0;
 
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    aligned_t loop_barrier = maxworkers;
+#endif
+
     assert(func);
     assert(qwa);
     assert(qthread_library_initialized);
@@ -583,6 +609,9 @@ static QINLINE void qt_loop_balance_inner(const size_t       start,
         qwa[i].level        = 0;
         qwa[i].spawnthreads = maxworkers;
         qwa[i].sync_type    = sync_type;
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+        qwa[i].loop_barrier = &loop_barrier;
+#endif
         switch (sync_type) {
             case SYNCVAR_T:
                 sync.syncvar[i] = SYNCVAR_EMPTY_INITIALIZER;
