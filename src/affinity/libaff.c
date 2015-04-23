@@ -18,18 +18,31 @@ struct {
   int num;
 } workers;
 
+int qt_get_unique_id(int i){
+  return i + 1;
+}
+
 void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
                                qthread_worker_id_t   *nbworkers,
                                size_t                *hw_par)
 {                           
   hwloc_topology_init(&topology);
+  hwloc_topology_load(topology);
   const char *bindstr = qt_internal_get_env_str("CPUBIND", "NOT_SET");
   if(!bindstr || strcmp("NOT_SET", bindstr) == 0){
-    hwloc_const_bitmap_t allowed = hwloc_topology_get_topology_cpuset(topology);
+    hwloc_const_bitmap_t allowed = hwloc_bitmap_dup(hwloc_topology_get_allowed_cpuset(topology));
     shep.num = 1;
+    if(!allowed){
+      printf("hwloc detection of allowed cpus failed\n");
+      exit(-1);
+    }
     workers.num = hwloc_bitmap_weight(allowed);
-    printf("Automatically setting %d workers\n", workers.num); 
-    //worker.binds = singlify(hwloc_topology_get_allowed_cpuset(topology));
+    workers.binds = malloc(sizeof(hwloc_cpuset_t) * workers.num);
+    for(int i = 0; i< workers.num; i++){
+      workers.binds[i] = hwloc_bitmap_alloc();  
+      workers.binds[i] = hwloc_bitmap_dup(allowed);
+    }
+    
   } else {
     char *bstr = malloc(strlen(bindstr));
     strcpy(bstr,bindstr);
