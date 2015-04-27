@@ -10,7 +10,7 @@ hwloc_topology_t topology;
 struct {
   hwloc_cpuset_t* binds;
   int num;
-} shep;
+} sheps;
 
 // Worker affinity bindings, indexed by packed_worker_id
 struct {
@@ -19,9 +19,12 @@ struct {
 } workers;
 
 int qt_get_unique_id(int i){
-  return i + 1;
+  return i;
 }
 
+// Checks affinity environment variables using the following precedence:
+//   1. QT_CPUBIND
+//   2. QT_NUM_SHEPHERDS -- QT_NUM_WORKERS_PER_SHEPHERD -- QT_NUM_WORKERS
 void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
                                qthread_worker_id_t   *nbworkers,
                                size_t                *hw_par)
@@ -30,30 +33,47 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
   hwloc_topology_load(topology);
   const char *bindstr = qt_internal_get_env_str("CPUBIND", "NOT_SET");
   if(!bindstr || strcmp("NOT_SET", bindstr) == 0){
+    size_t num_sheps = qt_internal_get_env_num("NUM_SHEPHERDS", 1, 1);
+    size_t num_workers_per_shepherd = qt_internal_get_env_num("NUM_WORKERS_PER_SHEPHERD", 0, 0);
+    size_t num_workers = qt_internal_get_env_num("HWPAR", 0, 0);
     hwloc_const_bitmap_t allowed = hwloc_bitmap_dup(hwloc_topology_get_allowed_cpuset(topology));
-    shep.num = 1;
     if(!allowed){
       printf("hwloc detection of allowed cpus failed\n");
       exit(-1);
     }
-    workers.num = hwloc_bitmap_weight(allowed);
+
+    // Determine number of workers
+    if(num_workers){
+      workers.num = num_workers;
+    } else if (num_workers_per_shepherd && num_sheps) {
+      workers.num = num_workers_per_shepherd * num_sheps;
+    } else {
+      workers.num = hwloc_bitmap_weight(allowed);
+    } 
+
+    // Determine number of shepherds 
+    if(num_sheps){
+      sheps.num = num_sheps;
+    } else {
+      sheps.num = 1;
+    }
+
     workers.binds = malloc(sizeof(hwloc_cpuset_t) * workers.num);
     for(int i = 0; i< workers.num; i++){
       workers.binds[i] = hwloc_bitmap_alloc();  
       workers.binds[i] = hwloc_bitmap_dup(allowed);
     }
-    
   } else {
     char *bstr = malloc(strlen(bindstr));
     strcpy(bstr,bindstr);
     int i,j;
-    shep.num = 1; 
+    sheps.num = 1; 
     i = 0;
     while(bstr[i] != 0){
-      if(bstr[i] == ':') shep.num ++;
+      if(bstr[i] == ':') sheps.num ++;
       i++;
     }
-    char ** ranges = malloc(sizeof(char**) * shep.num);
+    char ** ranges = malloc(sizeof(char**) * sheps.num);
     j = 0;
     ranges[j++] = bstr; 
     for(i=0; bstr[i] != 0; i++){
@@ -63,33 +83,37 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
       }
     }
 
-    shep.binds = malloc(sizeof(hwloc_cpuset_t) * shep.num);
+    sheps.binds = malloc(sizeof(hwloc_cpuset_t) * sheps.num);
     workers.num = 0;
-    for(i=0; i<shep.num; i++){
+    for(i=0; i<sheps.num; i++){
       char tmp[256];
-      shep.binds[i] = hwloc_bitmap_alloc();
-      hwloc_bitmap_list_sscanf(shep.binds[i], ranges[i]);
-      hwloc_bitmap_list_snprintf(tmp, 256, shep.binds[i]);
-      printf("Setting shep %d to cpus %s\n", i, tmp);
-      workers.num += hwloc_bitmap_weight(shep.binds[i]);
+      sheps.binds[i] = hwloc_bitmap_alloc();
+      hwloc_bitmap_list_sscanf(sheps.binds[i], ranges[i]);
+      hwloc_bitmap_list_snprintf(tmp, 256, sheps.binds[i]);
+      workers.num += hwloc_bitmap_weight(sheps.binds[i]);
     }
     j = 0;
     int id;
     workers.binds = malloc(sizeof(hwloc_cpuset_t) * workers.num);
-    for(i=0; i<shep.num; i++){
+    for(i=0; i<sheps.num; i++){
       char tmp[256];
-      hwloc_bitmap_foreach_begin(id, shep.binds[i])
+      hwloc_bitmap_foreach_begin(id, sheps.binds[i])
         workers.binds[j] = hwloc_bitmap_alloc();
         hwloc_bitmap_set(workers.binds[j], id);
         hwloc_bitmap_list_snprintf(tmp, 256, workers.binds[j]);
-        printf("Setting worker %d to cpu %s\n", j, tmp);
         j++;
       hwloc_bitmap_foreach_end();
     }
   }
-  *nbshepherds = shep.num;
-  *nbworkers = workers.num / shep.num;
+  *nbshepherds = sheps.num;
+  *nbworkers = workers.num / sheps.num;
   *hw_par = workers.num; 
+
+  // Sanity check
+  if(workers.num % sheps.num != 0){
+    printf("error: non-uniform number of workers per shepherd\n");
+    exit(-1);
+  }
 }
 
 void INTERNAL qt_affinity_set(qthread_worker_t *me,
