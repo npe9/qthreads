@@ -12,7 +12,7 @@ struct {
   int num;
 } shep;
 
-// Worker affinity bindings, indexed by worker_id
+// Worker affinity bindings, indexed by packed_worker_id
 struct {
   hwloc_cpuset_t* binds;
   int num;
@@ -95,7 +95,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 void INTERNAL qt_affinity_set(qthread_worker_t *me,
                               unsigned int      nworkerspershep)
 {                                                                                             
-  hwloc_set_cpubind(topology, workers.binds[me->worker_id], HWLOC_CPUBIND_THREAD);
+  hwloc_set_cpubind(topology, workers.binds[me->packed_worker_id], HWLOC_CPUBIND_THREAD);
 }                                     
 
 int INTERNAL qt_affinity_gendists(qthread_shepherd_t   *sheps,
