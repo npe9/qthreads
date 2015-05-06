@@ -22,9 +22,65 @@ int qt_get_unique_id(int i){
   return i;
 }
 
+void INTERNAL qt_affinity_balanced(int num_workers, int start, hwloc_obj_t obj){
+  if(num_workers > 0){
+    hwloc_obj_t child = obj->first_child;
+    if (child){
+      int arity = obj->arity;
+      int div = num_workers / arity;
+      int rem = num_workers % arity;
+      int n = start;
+      // Have a child, not a leaf
+      qt_affinity_balanced(div + rem, n, child);
+      child = child->next_sibling;
+      n += div + rem;
+      while(child){
+        qt_affinity_balanced(div, n, child); 
+        child = child->next_sibling;
+        n += div;
+      }
+    } else {
+      // No children
+      workers.binds[start] = hwloc_bitmap_alloc();
+      hwloc_bitmap_copy(workers.binds[start], obj->allowed_cpuset);
+      if(num_workers > 1){
+        printf("warning: PU oversubscribed\n");
+      }
+      if(hwloc_bitmap_weight(obj->allowed_cpuset) != 1){
+        printf("error: expected pu, got weight %d\n", hwloc_bitmap_weight(obj->allowed_cpuset));
+        exit(-1);
+      } 
+    }
+  }
+}
+
+int INTERNAL qt_affinity_compact(int num_workers, hwloc_obj_t obj)
+{
+  int n = num_workers;
+  hwloc_obj_t child = obj->first_child;
+  if (child) {
+    // Have a child, not a leaf
+    while(child && n > 0){
+      n = qt_affinity_compact(n, child);
+      child = child->next_sibling;
+    }
+  } else {
+    // No children, should be PU
+    workers.binds[workers.num - n] = hwloc_bitmap_alloc();
+    hwloc_bitmap_copy(workers.binds[workers.num - n], obj->allowed_cpuset);
+    if(hwloc_bitmap_weight(obj->allowed_cpuset) != 1){
+      printf("error: expected pu, got weight %d\n", hwloc_bitmap_weight(obj->allowed_cpuset));
+      exit(-1);
+    } 
+    return n - 1;
+  }
+  return n;
+}
+  
 // Checks affinity environment variables using the following precedence:
 //   1. QT_CPUBIND
-//   2. QT_NUM_SHEPHERDS -- QT_NUM_WORKERS_PER_SHEPHERD -- QT_NUM_WORKERS
+//   2. QT_NUM_SHEPHERDS -- QT_NUM_WORKERS_PER_SHEPHERD -- QT_HWPAR
+//      -- QT_BALANCED || QT_COMPACT
 void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
                                qthread_worker_id_t   *nbworkers,
                                size_t                *hw_par)
@@ -33,9 +89,10 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
   hwloc_topology_load(topology);
   const char *bindstr = qt_internal_get_env_str("CPUBIND", "NOT_SET");
   if(!bindstr || strcmp("NOT_SET", bindstr) == 0){
-    size_t num_sheps = qt_internal_get_env_num("NUM_SHEPHERDS", 1, 1);
+    size_t num_sheps = qt_internal_get_env_num("NUM_SHEPHERDS", 1, 0);
     size_t num_workers_per_shepherd = qt_internal_get_env_num("NUM_WORKERS_PER_SHEPHERD", 0, 0);
     size_t num_workers = qt_internal_get_env_num("HWPAR", 0, 0);
+    const char * affinity = qt_internal_get_env_str("LAYOUT", "NOT_SET");
     hwloc_const_bitmap_t allowed = hwloc_bitmap_dup(hwloc_topology_get_allowed_cpuset(topology));
     if(!allowed){
       printf("hwloc detection of allowed cpus failed\n");
@@ -63,6 +120,17 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
       workers.binds[i] = hwloc_bitmap_alloc();  
       workers.binds[i] = hwloc_bitmap_dup(allowed);
     }
+    hwloc_obj_t obj = hwloc_get_obj_inside_cpuset_by_depth(topology, allowed, 0, 0);
+    if (affinity && strcmp("COMPACT", affinity) == 0){
+      qt_affinity_compact(workers.num, obj);
+    }
+    if (affinity && strcmp("BALANCED", affinity) == 0){
+      qt_affinity_balanced(workers.num, 0, obj);
+    }
+
+      
+      
+
   } else {
     char *bstr = malloc(strlen(bindstr));
     strcpy(bstr,bindstr);
