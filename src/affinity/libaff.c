@@ -34,7 +34,8 @@ void INTERNAL qt_affinity_balanced(int num_workers, int start, hwloc_obj_t obj){
       while(child){
         int m = div;
         if(rem > 0){
-          m ++;
+          m++;
+          rem--;
         }
         qt_affinity_balanced(m, n, child); 
         child = child->next_sibling;
