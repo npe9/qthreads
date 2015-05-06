@@ -26,18 +26,19 @@ void INTERNAL qt_affinity_balanced(int num_workers, int start, hwloc_obj_t obj){
   if(num_workers > 0){
     hwloc_obj_t child = obj->first_child;
     if (child){
+      // Have a child, not a leaf
       int arity = obj->arity;
       int div = num_workers / arity;
       int rem = num_workers % arity;
       int n = start;
-      // Have a child, not a leaf
-      qt_affinity_balanced(div + rem, n, child);
-      child = child->next_sibling;
-      n += div + rem;
       while(child){
-        qt_affinity_balanced(div, n, child); 
+        int m = div;
+        if(rem > 0){
+          m ++;
+        }
+        qt_affinity_balanced(m, n, child); 
         child = child->next_sibling;
-        n += div;
+        n += m;
       }
     } else {
       // No children
