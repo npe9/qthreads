@@ -694,8 +694,8 @@ void API_FUNC qt_loop_balance(const size_t    start,
                               const qt_loop_f func,
                               void           *argptr)
 {                                      /*{{{ */
-    printf("Start:%lu, Stop:%lu\n", start, stop);
 #ifdef LOOP_BALANCE_PROFILE
+    printf("Start:%lu, Stop:%lu\n", start, stop);
     qtimer_t time_loop_balance_start = qtimer_create();
     qtimer_start(time_loop_balance_start);
     printf("time_loop_balance: start: %f\n", qtimer_wtime());
