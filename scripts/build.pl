@@ -36,6 +36,12 @@ my %config = (
     oversubscription => '--enable-oversubscription',
     guard_pages => '--enable-guard-pages',
     chapel_default => '--enable-static --disable-shared --enable-condwait-queue --disable-spawn-cache --with-scheduler=nemesis',
+    # CHIUW 2015 configuration options
+    libaff => '--with-topology=libaff',
+    disable_spawn_cache => '--disable-spawn-cache',
+    enable_spawn_cache => '--enable-spawn-cache',
+    disable_condwait_queue => '--disable-condwait-queue',
+    enable_condwait_queue => '--enable-condwait-queue',
 );
 
 my @summaries;
