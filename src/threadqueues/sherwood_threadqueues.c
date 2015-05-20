@@ -161,6 +161,11 @@ static inline void sanity_check_queue(qt_threadqueue_t *q)
 # define PARANOIA_ONLY(x)
 #endif /* ifndef QTHREAD_NO_ASSERTS */
 
+void INTERNAL qt_threadqueue_print_status(void)
+{
+    print_status("Scheduler: sherwood\n");
+}
+
 /* Memory Management */
 #if defined(UNPOOLED_QUEUES) || defined(UNPOOLED)
 # define ALLOC_THREADQUEUE() (qt_threadqueue_t *)MALLOC(sizeof(qt_threadqueue_t))

@@ -76,6 +76,11 @@ qt_threadqueue_pools_t generic_threadqueue_pools = { NULL, NULL };
 # define ALLOC_TQNODE()      (qt_threadqueue_node_t *)qt_mpool_alloc(generic_threadqueue_pools.nodes)
 # define FREE_TQNODE(t)      qt_mpool_free(generic_threadqueue_pools.nodes, t)
 
+void INTERNAL qt_threadqueue_print_status(void)
+{
+    print_status("Scheduler: nemesis\n");
+}
+
 static void qt_threadqueue_subsystem_shutdown(void)
 {   /*{{{*/
     qt_mpool_destroy(generic_threadqueue_pools.queues);
