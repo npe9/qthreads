@@ -73,9 +73,9 @@ void INTERNAL qt_affinity_set(qthread_worker_t * me,
                               unsigned int nworkerspershep);
 
 /** 
- * qt_get_unique_id() - get unique id for a given packed id
+ * qt_affinity_get_unique_id() - get unique id for a given packed id
  */
-int INTERNAL qt_get_unique_id(int packed_id);
+int INTERNAL qt_affinity_get_unique_id(int packed_id);
 
 /**
  * qt_affinity_gendists() - establish distance information, per-shep

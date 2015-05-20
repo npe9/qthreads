@@ -1195,7 +1195,7 @@ int API_FUNC qthread_initialize(void)
     QTHREAD_CASLOCK_INIT(qlib->shepherds[0].workers[0].active, 1);
     qthread_debug(CORE_DETAILS, "initialized caslock 0,0 %p\n", &qlib->shepherds[0].workers[0].active);
     qlib->shepherds[0].workers[0].worker_id = 0;
-    qlib->shepherds[0].workers[0].unique_id = qt_get_unique_id(0); 
+    qlib->shepherds[0].workers[0].unique_id = qt_affinity_get_unique_id(0); 
     qthread_makecontext(&(qlib->master_context), qlib->master_stack,
                         qlib->master_stack_size,
 #ifdef QTHREAD_MAKECONTEXT_SPLIT
@@ -1262,7 +1262,7 @@ int API_FUNC qthread_initialize(void)
             }
             qlib->shepherds[i].workers[j].shepherd  = &qlib->shepherds[i];
             qlib->shepherds[i].workers[j].worker_id = j;
-            qlib->shepherds[i].workers[j].unique_id = qt_get_unique_id(j + (i * nworkerspershep));
+            qlib->shepherds[i].workers[j].unique_id = qt_affinity_get_unique_id(j + (i * nworkerspershep));
             if (print_info){
               print_status("shep %d, worker %d, unique id[%d]=%d\n", i, j, j + (i * nworkerspershep), qlib->shepherds[i].workers[j].unique_id);
             }

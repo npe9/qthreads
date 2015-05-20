@@ -201,7 +201,6 @@ if ($use_chiuw2015) {
                 }
 
                 $config{$name} = join(' ', @subconf_profiles);
-                print "Config '$name': $config{$name}\n";
                 push @chiuw2015_conf_names, $name;
             }
         }

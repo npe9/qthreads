@@ -18,7 +18,7 @@ struct {
   int num;
 } workers;
 
-int qt_get_unique_id(int i){
+int INTERNAL qt_affinity_get_unique_id(int i){
   return i;
 }
 
