@@ -15,6 +15,7 @@ my %config = (
     compat        => 'CFLAGS="-m32" CXXFLAGS="-m32" LDFLAGS="-m32" CPPFLAGS="-m32"',
     unpooled      => '--disable-pooled-memory',
     opt           => 'CFLAGS="-O3" CXXFLAGS="-O3"',
+    sherwood       => '--with-scheduler=sherwood',
     nemesis       => '--with-scheduler=nemesis',
     lifo          => '--with-scheduler=lifo',
     mutexfifo     => '--with-scheduler=mutexfifo',
@@ -187,7 +188,21 @@ if ($use_chiuw2015) {
     foreach my $scheduler (@schedulers) {
         foreach my $sc_opt (@sc) {
             foreach my $cq_opt (@cq) {
-                push @chiuw2015_conf_names, "icc+libaff+opt+$scheduler+$sc_opt+$cq_opt";
+                my $name = "icc+libaff+opt+$scheduler+$sc_opt+$cq_opt";
+                my @subconf_names = split(/\+/, $name);
+                my @subconf_profiles = ();
+                foreach my $subname (@subconf_names) {
+                    if (exists $config{$subname}) {
+                        push @subconf_profiles, $config{$subname};
+                    } else {
+                        print "Invalid configuration option '$subname'\n";
+                        exit(1);
+                    }
+                }
+
+                $config{$name} = join(' ', @subconf_profiles);
+                print "Config '$name': $config{$name}\n";
+                push @chiuw2015_conf_names, $name;
             }
         }
     }
@@ -220,7 +235,7 @@ if ($qt_install_dir eq '') {
     exit(1);
 } else {
     foreach my $name (@conf_names) {
-        $config{$name} = join(' ', "--prefix=$qt_install_dir/$name");
+        $config{$name} = join(" ", ("--prefix=$qt_install_dir/$name ", $config{$name}));
     }
 }
 
