@@ -154,9 +154,12 @@ if ($need_help) {
 
 # Clean up and sanity check script options
 my $use_all = 0;
+my $use_chiuw2015 = 0;
 foreach my $name (@conf_names) {
     if ($name eq 'all') {
         $use_all = 1;
+    } elsif ($name eq 'chiuw2015') {
+        $use_chiuw2015 = 1;
     } elsif (not exists $config{$name}) {
         my @subconf_names = split(/\+/, $name);
         my @subconf_profiles = ();
@@ -174,6 +177,22 @@ foreach my $name (@conf_names) {
 }
 if ($use_all) {
     @conf_names = @default_conf_names;
+}
+if ($use_chiuw2015) {
+    my @schedulers = ('nemesis', 'sherwood', 'mtsfifo', 'lifo');
+    my @sc = ('enable_spawn_cache', 'disable_spawn_cache');
+    my @cq = ('enable_condwait_queue', 'disable_condwait_queue');
+    my @chiuw2015_conf_names;
+  
+    foreach my $scheduler (@schedulers) {
+        foreach my $sc_opt (@sc) {
+            foreach my $cq_opt (@cq) {
+                push @chiuw2015_conf_names, "icc+libaff+opt+$scheduler+$sc_opt+$cq_opt";
+            }
+        }
+    }
+
+    @conf_names = @chiuw2015_conf_names
 }
 
 if ($qt_src_dir eq '') {
