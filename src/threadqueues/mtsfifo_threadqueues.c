@@ -277,7 +277,7 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
         QTHREAD_COND_LOCK(q->trigger);
         if (q->fruitless) {
             q->fruitless = 0;
-            QTHREAD_BCAST(q->trigger);
+            QTHREAD_COND_BCAST(q->trigger);
         }
         QTHREAD_COND_UNLOCK(q->trigger);
     }
