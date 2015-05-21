@@ -43,6 +43,11 @@ struct _qt_threadqueue {
     saligned_t advisory_queuelen;
 } /* qt_threadqueue_t */;
 
+void INTERNAL qt_threadqueue_print_status(void)
+{
+    print_status("Scheduler: mtsfifo\n");
+}
+
 /* Memory Management */
 #if defined(UNPOOLED_QUEUES) || defined(UNPOOLED)
 # define ALLOC_THREADQUEUE() (qt_threadqueue_t *)MALLOC(sizeof(qt_threadqueue_t))
@@ -59,11 +64,6 @@ static void FREE_TQNODE(void *p)
 {
     FREE_SCRIBBLE(p, sizeof(qt_threadqueue_node_t));
     qthread_internal_aligned_free(p, 16);
-}
-
-void INTERNAL qt_threadqueue_print_status(void)
-{
-    print_status("Scheduler: mtsfifo\n");
 }
 
 void INTERNAL qt_threadqueue_subsystem_init(void) {}
