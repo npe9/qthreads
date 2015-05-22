@@ -61,6 +61,7 @@ my $force_clean = 0;
 my $print_info = 0;
 my $dry_run = 0;
 my $quietly = 0;
+my $no_tests = 0;
 my $need_help = 0;
 
 if (scalar @ARGV == 0) {
@@ -94,7 +95,8 @@ if (scalar @ARGV == 0) {
         } elsif ($flag eq '--quietly') {
             $quietly = 1;
         } elsif ($flag =~ m/--tests=(.*)/) {
-            @check_tests = split(/,/,$1) unless ($1 eq 'all')
+            @check_tests = split(/,/,$1) unless ($1 eq 'all');
+            $no_tests = 1 if ($1 eq 'none');
         } elsif ($flag eq '--help' || $flag eq '-h') {
             $need_help = 1;
         } else {
@@ -131,7 +133,9 @@ if ($need_help) {
     print "\t                        can be used multiple times.\n";
     print "\t--tests=<test-suite>    comma-separated list of test suites. Valid\n";
     print "\t                        test suites are 'basics', 'features', and\n";
-    print "\t                        'stress'. The default is to run all three.\n";
+    print "\t                        'stress'. Aliases 'all' and 'none' can be used\n";
+    print "\t                        to run all three or none of the test suites.\n";
+    print "\t                        The default is to run all three.\n";
     print "\t--source-dir=<dir>      absolute path to Qthreads source.\n";
     print "\t--build-dir=<dir>       absolute path to target build directory.\n";
     print "\t--install-dir=<dir>     absolute path to target installation directory.\n";
@@ -315,93 +319,95 @@ sub run_tests {
     }
 
     # Build testsuite
-    my %failcounts;
-    my $failing_tests = 0;
-    my $passing_tests = 0;
-    my $pass = 1;
-    while ($pass <= $repeat) {
-        print "###\tBuilding and testing '$conf_name' pass $pass ...\n"
-            unless $quietly;
-        my $results_log = "$test_dir/build.$pass.results.log";
-        print "### Log: $results_log\n" unless $quietly;
-        print "### Results for '$conf_name'\n" unless $quietly;
-        my $banner = '=' x 50;
-        print "$banner\n" unless $quietly;
+    if (0 == $no_tests) {
+        my %failcounts;
+        my $failing_tests = 0;
+        my $passing_tests = 0;
+        my $pass = 1;
+        while ($pass <= $repeat) {
+            print "###\tBuilding and testing '$conf_name' pass $pass ...\n"
+                unless $quietly;
+            my $results_log = "$test_dir/build.$pass.results.log";
+            print "### Log: $results_log\n" unless $quietly;
+            print "### Results for '$conf_name'\n" unless $quietly;
+            my $banner = '=' x 50;
+            print "$banner\n" unless $quietly;
 
-        my @make_test_suites = ('basics', 'features', 'stress');
-        if (scalar @check_tests == 0) { @check_tests = @make_test_suites};
-        foreach my $make_test_suite (@check_tests) {
-            my $check_command = "cd $test_dir";
-            $check_command .= " && make clean > /dev/null" if ($force_clean);
-            $check_command .= " && make $make_flags -C test/$make_test_suite check 2>&1 | tee $results_log";
-            my_system($check_command);
-            if (not $dry_run) {
-                my $check_warnings = qx/awk '\/warning:\/' $results_log/;
-                if (length $check_warnings > 0) {
-                    print "Build warnings in config $conf_name! Check log and/or run again with --force-clean and --verbose for more information.\n";
-                    print $check_warnings;
-                }
-                my $check_errors = qx/awk '\/error:\/' $results_log/;
-                if (length $check_errors > 0) {
-                    print "Build error in config $conf_name! Check log and/or run again with --verbose for more information.\n";
-                    print $check_errors;
-                    exit(1);
-                }
-
-                # Display filtered results
-                my $digest = qx/grep 'tests passed' $results_log/;
-                my $digest_msg = '';
-                if ($digest eq '') {
-                    $digest = qx/grep '# PASS:' $results_log/;
-                }
-                if ($digest eq '') {
-                    $digest = qx/grep 'tests failed' $results_log/; chomp($digest);
-                    $digest =~ /([0-9]+) of ([0-9]+) tests failed/;
-                    $failing_tests += $1;
-                    $passing_tests += $2 - $1;
-                    my $fails = qx/awk '\/FAIL\/{print \$2}' $results_log/;
-                    my $fail_list .= join(',', split(/\n/, $fails));
-                    foreach my $test (split(/\n/, $fails)) {
-                        $failcounts{$test} ++;
+            my @make_test_suites = ('basics', 'features', 'stress');
+            if (scalar @check_tests == 0) { @check_tests = @make_test_suites};
+            foreach my $make_test_suite (@check_tests) {
+                my $check_command = "cd $test_dir";
+                $check_command .= " && make clean > /dev/null" if ($force_clean);
+                $check_command .= " && make $make_flags -C test/$make_test_suite check 2>&1 | tee $results_log";
+                my_system($check_command);
+                if (not $dry_run) {
+                    my $check_warnings = qx/awk '\/warning:\/' $results_log/;
+                    if (length $check_warnings > 0) {
+                        print "Build warnings in config $conf_name! Check log and/or run again with --force-clean and --verbose for more information.\n";
+                        print $check_warnings;
                     }
-                    $digest_msg = $failing_tests . ' tests failed';
-                    $digest_msg .= " ($fail_list)";
-                } else {
-                    chomp $digest;
-                    $digest = qx/grep 'All .* tests passed' $results_log/;
+                    my $check_errors = qx/awk '\/error:\/' $results_log/;
+                    if (length $check_errors > 0) {
+                        print "Build error in config $conf_name! Check log and/or run again with --verbose for more information.\n";
+                        print $check_errors;
+                        exit(1);
+                    }
+
+                    # Display filtered results
+                    my $digest = qx/grep 'tests passed' $results_log/;
+                    my $digest_msg = '';
                     if ($digest eq '') {
-                        $digest = qx/grep 'TOTAL:' $results_log/;
-                        $digest =~ /TOTAL: ([0-9]+)/;
-                        $passing_tests += $1;
-                    } else {
-                        $digest =~ /All ([0-9]+) tests passed/;
-                        $passing_tests += $1;
+                        $digest = qx/grep '# PASS:' $results_log/;
                     }
-                    $digest_msg = $passing_tests . ' tests passed';
+                    if ($digest eq '') {
+                        $digest = qx/grep 'tests failed' $results_log/; chomp($digest);
+                        $digest =~ /([0-9]+) of ([0-9]+) tests failed/;
+                        $failing_tests += $1;
+                        $passing_tests += $2 - $1;
+                        my $fails = qx/awk '\/FAIL\/{print \$2}' $results_log/;
+                        my $fail_list .= join(',', split(/\n/, $fails));
+                        foreach my $test (split(/\n/, $fails)) {
+                            $failcounts{$test} ++;
+                        }
+                        $digest_msg = $failing_tests . ' tests failed';
+                        $digest_msg .= " ($fail_list)";
+                    } else {
+                        chomp $digest;
+                        $digest = qx/grep 'All .* tests passed' $results_log/;
+                        if ($digest eq '') {
+                            $digest = qx/grep 'TOTAL:' $results_log/;
+                            $digest =~ /TOTAL: ([0-9]+)/;
+                            $passing_tests += $1;
+                        } else {
+                            $digest =~ /All ([0-9]+) tests passed/;
+                            $passing_tests += $1;
+                        }
+                        $digest_msg = $passing_tests . ' tests passed';
+                    }
+                    print "$digest_msg - $make_test_suite\n" unless $quietly;
                 }
-                print "$digest_msg - $make_test_suite\n" unless $quietly;
             }
-        }
-        print "$banner\n" unless $quietly;
+            print "$banner\n" unless $quietly;
 
-        $pass++;
-    }
-    if (not $dry_run) {
-        my $summary = sprintf("%17s: ", $conf_name);
-        if ($failing_tests eq 0) {
-            $summary .= "All $passing_tests tests passed";
-        } elsif ($passing_tests eq 0) {
-            $summary .= "All $failing_tests tests FAILED!!!";
-        } else {
-            $summary .= "$passing_tests test".(($passing_tests!=1)?"s":"")." passed, ";
-            $summary .= "$failing_tests test".(($failing_tests!=1)?"s":"")." failed (";
-            foreach my $test (keys(%failcounts)) {
-                $summary .= "$test:$failcounts{$test} ";
-            }
-            chop($summary);
-            $summary .= ")";
+            $pass++;
         }
-        push @summaries, $summary;
+        if (not $dry_run) {
+            my $summary = sprintf("%17s: ", $conf_name);
+            if ($failing_tests eq 0) {
+                $summary .= "All $passing_tests tests passed";
+            } elsif ($passing_tests eq 0) {
+                $summary .= "All $failing_tests tests FAILED!!!";
+            } else {
+                $summary .= "$passing_tests test".(($passing_tests!=1)?"s":"")." passed, ";
+                $summary .= "$failing_tests test".(($failing_tests!=1)?"s":"")." failed (";
+                foreach my $test (keys(%failcounts)) {
+                    $summary .= "$test:$failcounts{$test} ";
+                }
+                chop($summary);
+                $summary .= ")";
+            }
+            push @summaries, $summary;
+        }
     }
 }
 
