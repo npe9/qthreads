@@ -38,6 +38,7 @@ my %config = (
     guard_pages => '--enable-guard-pages',
     chapel_default => '--enable-static --disable-shared --enable-condwait-queue --disable-spawn-cache --with-scheduler=nemesis',
     # CHIUW 2015 configuration options
+    opt_phi => 'CFLAGS="-O3 -mmic" CXXFLAGS="-O3 -mmic" --host=mic-unknown-linux-gnu --enable-static --disable-shared',
     libaff => '--with-topology=libaff',
     disable_spawn_cache => '--disable-spawn-cache',
     enable_spawn_cache => '--enable-spawn-cache',
@@ -50,6 +51,7 @@ my @summaries;
 # Collect command-line options
 my @conf_names;
 my @check_tests;
+my $config_extras;
 my @user_configs;
 my $qt_src_dir = '';
 my $qt_bld_dir = '';
@@ -74,6 +76,8 @@ if (scalar @ARGV == 0) {
             @conf_names = split(/,/, $1);
         } elsif ($flag =~ m/--with-config=(.*)/) {
             push @user_configs, $1;
+        } elsif ($flag =~ m/--with-config-extras=(.*)/) {
+            $config_extras = $1;
         } elsif ($flag =~ m/--source-dir=(.*)/) {
             $qt_src_dir = $1;
         } elsif ($flag =~ m/--build-dir=(.*)/) {
@@ -131,6 +135,9 @@ if ($need_help) {
     print "\t                        an unnamed 'config', whereas the previous\n";
     print "\t                        uses pre-defined, named configs. This option\n";
     print "\t                        can be used multiple times.\n";
+    print "\t--with-config-extras=<string> a user-specified string of configuration\n";
+    print "\t                        options that are appended to the end of each\n";
+    print "\t                        configure command.\n";
     print "\t--tests=<test-suite>    comma-separated list of test suites. Valid\n";
     print "\t                        test suites are 'basics', 'features', and\n";
     print "\t                        'stress'. Aliases 'all' and 'none' can be used\n";
@@ -165,6 +172,8 @@ foreach my $name (@conf_names) {
         $use_all = 1;
     } elsif ($name eq 'chiuw2015') {
         $use_chiuw2015 = 1;
+    } elsif ($name eq 'chiuw2015.phi') {
+        $use_chiuw2015 = 2;
     } elsif (not exists $config{$name}) {
         my @subconf_names = split(/\+/, $name);
         my @subconf_profiles = ();
@@ -184,15 +193,22 @@ if ($use_all) {
     @conf_names = @default_conf_names;
 }
 if ($use_chiuw2015) {
+    my $base_options = "icc+libaff";
     my @schedulers = ('nemesis', 'sherwood', 'mtsfifo', 'lifo');
     my @sc = ('enable_spawn_cache', 'disable_spawn_cache');
     my @cq = ('enable_condwait_queue', 'disable_condwait_queue');
     my @chiuw2015_conf_names;
-  
+ 
+    if (1 == $use_chiuw2015) {
+        $base_options = "$base_options+opt";
+    } else {
+        $base_options = "$base_options+opt_phi";
+    }
+
     foreach my $scheduler (@schedulers) {
         foreach my $sc_opt (@sc) {
             foreach my $cq_opt (@cq) {
-                my $name = "icc+libaff+opt+$scheduler+$sc_opt+$cq_opt";
+                my $name = "$base_options+$scheduler+$sc_opt+$cq_opt";
                 my @subconf_names = split(/\+/, $name);
                 my @subconf_profiles = ();
                 foreach my $subname (@subconf_names) {
@@ -289,7 +305,7 @@ sub run_tests {
     if (not $qt_install_dir eq '') {
         my_system("mkdir -p $qt_install_dir/$conf_name") if (not -e "$qt_install_dir/$conf_name");
     }
-    my_system("cd $test_dir && $qt_src_dir/configure $config{$conf_name} 2>&1 | tee $configure_log")
+    my_system("cd $test_dir && $qt_src_dir/configure $config{$conf_name} $config_extras 2>&1 | tee $configure_log")
         if ($force_configure || not -e "$test_dir/config.log");
     print "### Log: $configure_log\n" unless $quietly;
 
