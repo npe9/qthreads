@@ -481,8 +481,6 @@ qthread_t INTERNAL * qt_threadqueue_dequeue_specific(qt_threadqueue_t * q,
 size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
 {
     switch (policy) {
-        case SINGLE_WORKER:
-            return THREADQUEUE_POLICY_TRUE;
         default:
             return THREADQUEUE_POLICY_UNSUPPORTED;
     }
