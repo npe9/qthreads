@@ -134,9 +134,6 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
       qt_affinity_balanced(workers.num, 0, obj);
     }
 
-      
-      
-
   } else {
     char *bstr = malloc(strlen(bindstr));
     strcpy(bstr,bindstr);
@@ -165,7 +162,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
       char tmp[256];
       sheps.binds[i] = hwloc_bitmap_alloc();
       hwloc_bitmap_list_sscanf(sheps.binds[i], ranges[i]);
-      hwloc_bitmap_list_snprintf(tmp, 256, sheps.binds[i]);
+      //hwloc_bitmap_list_snprintf(tmp, 256, sheps.binds[i]);
       workers.num += hwloc_bitmap_weight(sheps.binds[i]);
     }
     j = 0;
@@ -176,7 +173,7 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
       hwloc_bitmap_foreach_begin(id, sheps.binds[i])
         workers.binds[j] = hwloc_bitmap_alloc();
         hwloc_bitmap_set(workers.binds[j], id);
-        hwloc_bitmap_list_snprintf(tmp, 256, workers.binds[j]);
+        //hwloc_bitmap_list_snprintf(tmp, 256, workers.binds[j]);
         j++;
       hwloc_bitmap_foreach_end();
     }
