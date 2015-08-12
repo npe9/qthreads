@@ -43,6 +43,11 @@ struct _qt_threadqueue {
     saligned_t advisory_queuelen;
 } /* qt_threadqueue_t */;
 
+void INTERNAL qt_threadqueue_print_status(void)
+{
+    print_status("Scheduler: mtsfifo\n");
+}
+
 /* Memory Management */
 #if defined(UNPOOLED_QUEUES) || defined(UNPOOLED)
 # define ALLOC_THREADQUEUE() (qt_threadqueue_t *)MALLOC(sizeof(qt_threadqueue_t))
@@ -272,7 +277,7 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
         QTHREAD_COND_LOCK(q->trigger);
         if (q->fruitless) {
             q->fruitless = 0;
-            QTHREAD_BCAST(q->trigger);
+            QTHREAD_COND_BCAST(q->trigger);
         }
         QTHREAD_COND_UNLOCK(q->trigger);
     }
@@ -476,8 +481,6 @@ qthread_t INTERNAL * qt_threadqueue_dequeue_specific(qt_threadqueue_t * q,
 size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
 {
     switch (policy) {
-        case SINGLE_WORKER:
-            return THREADQUEUE_POLICY_TRUE;
         default:
             return THREADQUEUE_POLICY_UNSUPPORTED;
     }

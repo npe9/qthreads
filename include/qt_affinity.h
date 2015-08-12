@@ -72,6 +72,11 @@ void INTERNAL qt_affinity_init(qthread_shepherd_id_t *nbshepherds,
 void INTERNAL qt_affinity_set(qthread_worker_t * me,
                               unsigned int nworkerspershep);
 
+/** 
+ * qt_affinity_get_unique_id() - get unique id for a given packed id
+ */
+int INTERNAL qt_affinity_get_unique_id(int packed_id);
+
 /**
  * qt_affinity_gendists() - establish distance information, per-shep
  * @sheps:      The shepherd struct containing information about all shepherds.

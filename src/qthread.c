@@ -42,6 +42,7 @@
 #if (defined(QTHREAD_SHEPHERD_PROFILING) || defined(QTHREAD_FEB_PROFILING))
 # include "qthread/qtimer.h"
 #endif
+#include "qthread/qtimer.h"
 #include "qthread/barrier.h"
 
 /******************************************************/
@@ -114,6 +115,8 @@ extern int                   powerOff;
 qlib_t qlib      = NULL;
 int    qaffinity = 1;
 QTHREAD_FASTLOCK_ATTRVAR;
+
+aligned_t barrier_for_workers = 0;
 
 struct qt_cleanup_funcs_s {
     void                       (*func)(void);
@@ -492,6 +495,21 @@ static void *qthread_master(void *arg)
 #endif /* ifdef QTHREAD_LOCAL_PRIORITY */
     assert(threadqueue);
 
+    // Skip this for the first worker, since it will enter the barrier after
+    // spawning the other workers
+    if (!(1 == me_worker->unique_id)) {
+        if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+            // Wait for all workers to be ready to enter work loop
+            qthread_incr64(&barrier_for_workers, -1);
+            while (0 != qthread_cas(&barrier_for_workers, 0, 0)) {
+                SPINLOCK_BODY();
+            }
+        }
+#ifdef WORKER_START_PROFILE
+        printf("Worker %d started at %f\n", me_worker->unique_id, qtimer_wtime());
+#endif
+    }
+
     while (!done) {
 #ifdef QTHREAD_SHEPHERD_PROFILING
         qtimer_start(idle);
@@ -868,6 +886,39 @@ int API_FUNC qthread_initialize_agg(int(*agg_cost) (int count, qthread_f* f, voi
     return r;
 }
 
+static inline void print_config_info(uint_fast8_t const print_info) {
+    if (print_info) {
+        qt_threadqueue_print_status();
+#ifdef QTHREAD_USE_SPAWNCACHE
+        print_status("Spawn cache: enabled\n");
+#else
+        print_status("Spawn cache: disabled\n");
+#endif
+#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
+        print_status("Condwait queue: enabled\n");
+#else
+        print_status("Condwait queue: disabled\n");
+#endif
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+        if (qt_internal_get_env_num("LOOP_BALANCE_BARRIER", 1, 0)) {
+            print_status("Loop balance barrier: enabled\n");
+        } else {
+            print_status("Loop balance barrier: disabled\n");
+        }
+#endif
+    }
+}
+
+static inline void print_envvar_info(uint_fast8_t const print_info) {
+    if (print_info) {
+        if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+            print_status("Wait for workers: enabled\n");
+        } else {
+            print_status("Wait for workers: disabled\n");
+        }
+    }
+}
+
 int API_FUNC qthread_initialize(void)
 {                      /*{{{ */
     int                   r;
@@ -880,6 +931,8 @@ int API_FUNC qthread_initialize(void)
     extern unsigned int QTHREAD_LOCKING_STRIPES;
 
     print_info = qt_internal_get_env_num("INFO", 0, 1);
+    print_config_info(print_info);
+    print_envvar_info(print_info);
 
     QTHREAD_FASTLOCK_SETUP();
 #ifdef QTHREAD_DEBUG
@@ -945,7 +998,7 @@ int API_FUNC qthread_initialize(void)
     qlib->nworkerspershep   = nworkerspershep;
     qlib->nshepherds_active = nshepherds;
     qlib->shepherds         = (qthread_shepherd_t *)calloc(nshepherds, sizeof(qthread_shepherd_t));
-    qlib->threadqueues      = (qt_threadqueue_t **)MALLOC(nshepherds * sizeof(qt_threadqueue_t *));
+    qlib->threadqueues      = (qt_threadqueue_t **)calloc(nshepherds, sizeof(qt_threadqueue_t *));
 #ifdef QTHREAD_LOCAL_PRIORITY
     qlib->local_priority_queues = (qt_threadqueue_t **)MALLOC(nshepherds * sizeof(qt_threadqueue_t *));
 #endif /* ifdef QTHREAD_LOCAL_PRIORITY */
@@ -1142,8 +1195,7 @@ int API_FUNC qthread_initialize(void)
     QTHREAD_CASLOCK_INIT(qlib->shepherds[0].workers[0].active, 1);
     qthread_debug(CORE_DETAILS, "initialized caslock 0,0 %p\n", &qlib->shepherds[0].workers[0].active);
     qlib->shepherds[0].workers[0].worker_id = 0;
-    qlib->shepherds[0].workers[0].unique_id = qthread_internal_incr(&(qlib->max_unique_id),
-                                                                    &qlib->max_unique_id_lock, 1);
+    qlib->shepherds[0].workers[0].unique_id = qt_affinity_get_unique_id(0); 
     qthread_makecontext(&(qlib->master_context), qlib->master_stack,
                         qlib->master_stack_size,
 #ifdef QTHREAD_MAKECONTEXT_SPLIT
@@ -1182,6 +1234,10 @@ int API_FUNC qthread_initialize(void)
     qlib->nworkers_active = hw_par;
 # endif /* ifdef QTHREAD_RCRTOOL */
 
+    if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+        // Set up barrier for all workers
+        qthread_incr64(&barrier_for_workers, nshepherds * nworkerspershep);
+    }
 /* spawn the shepherds */
     for (i = 0; i < nshepherds; ++i) {
         qthread_worker_id_t j;
@@ -1206,8 +1262,10 @@ int API_FUNC qthread_initialize(void)
             }
             qlib->shepherds[i].workers[j].shepherd  = &qlib->shepherds[i];
             qlib->shepherds[i].workers[j].worker_id = j;
-            qlib->shepherds[i].workers[j].unique_id = qthread_internal_incr(&(qlib->max_unique_id),
-                                                                            &qlib->max_unique_id_lock, 1);
+            qlib->shepherds[i].workers[j].unique_id = qt_affinity_get_unique_id(j + (i * nworkerspershep));
+            if (print_info){
+              print_status("shep %d, worker %d, unique id[%d]=%d\n", i, j, j + (i * nworkerspershep), qlib->shepherds[i].workers[j].unique_id);
+            }
             qlib->shepherds[i].workers[j].packed_worker_id = j + (i * nworkerspershep);
 
             if ((j * nshepherds) + i + 1 > hw_par) {
@@ -1262,6 +1320,17 @@ int API_FUNC qthread_initialize(void)
     if (NULL != qt_internal_get_env_str("MULTINODE", NULL)) {
         qthread_multinode_initialize();
     }
+#endif
+
+    if (qt_internal_get_env_num("WAIT_FOR_WORKERS", 0, 1)) {
+        // Wait for all workers to be ready to enter work loop
+        qthread_incr64(&barrier_for_workers, -1);
+        while (0 != qthread_cas(&barrier_for_workers, 0, 0)) {
+            SPINLOCK_BODY();
+        }
+    }
+#ifdef WORKER_START_PROFILE
+    printf("Worker %d started at %f\n", 0, qtimer_wtime());
 #endif
 
     qthread_debug(CORE_DETAILS, "finished.\n");
@@ -1972,7 +2041,7 @@ size_t API_FUNC qthread_readstate(const enum introspective_state type)
             {
                 qthread_worker_t *worker = (qthread_worker_t *)TLS_GET(shepherd_structs);
 
-                return worker ? (worker->unique_id - 1) : NO_WORKER;
+                return worker ? worker->unique_id : NO_WORKER;
             }
 
         case CURRENT_TEAM:

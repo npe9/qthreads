@@ -4,6 +4,7 @@
 
 /* System Headers */
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Installed Headers */
 #include <qthread/qthread.h>
@@ -23,13 +24,19 @@
 
 #ifdef QTHREAD_USE_ROSE_EXTENSIONS
 # include <stdio.h>
-# include "qt_atomics.h"
 # include "qt_threadqueues.h" // for qthread_steal_disable
 #endif
 
 #ifdef QTHREAD_RCRTOOL
 int64_t maestro_size(void);
 #endif
+
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+# include "qt_envariables.h"
+# include "qt_atomics.h"
+#endif
+
+aligned_t qloop_wrapper_barrier = 0;
 
 typedef enum {
     ALIGNED,
@@ -54,6 +61,9 @@ struct qloop_wrapper_args {
     synctype_t sync_type;
     unsigned   spawn_flags;
     void      *sync;
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    aligned_t *loop_barrier;
+#endif
 };
 
 static QINLINE void qt_loop_balance_inner(const size_t       start,
@@ -72,6 +82,16 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
     size_t           new_id      = my_id + (1 << level);
     const synctype_t sync_type   = arg->sync_type;
     void *const      sync        = arg->sync;
+
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    aligned_t      * loop_barrier = arg->loop_barrier;
+#endif
+
+#ifdef LOOP_BALANCE_PROFILE
+    size_t const     this_level  = level;
+    size_t const     this_my_id  = my_id;
+    size_t const     this_unique_worker_id = qthread_readstate(CURRENT_UNIQUE_WORKER);
+#endif
 
     switch (sync_type) {
         case SYNCVAR_T:
@@ -131,8 +151,26 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
             }
     }
 
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    if (NULL != loop_barrier) {
+        // Barrier before doing work
+        qthread_incr64(loop_barrier, -1);
+        while (0 != qthread_cas(loop_barrier, 0, 0)) {
+            SPINLOCK_BODY();
+        }
+    }
+#endif
+
+#ifdef LOOP_BALANCE_PROFILE
+    printf("time_loop_balance: chunk start: this_level %lu this_my_id %lu startat %lu stopat %lu this_unique_worker_id %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, this_unique_worker_id, qtimer_wtime());
+#endif
+
     // and now, we execute the function
     arg->func(arg->startat, arg->stopat, arg->arg);
+
+#ifdef LOOP_BALANCE_PROFILE
+    printf("time_loop_balance: chunk stop: this_level %lu this_my_id %lu startat %lu stopat %lu this_unique_worker_id %lu wtime %f\n", this_level, this_my_id, arg->startat, arg->stopat, this_unique_worker_id, qtimer_wtime());
+#endif
 
     switch (sync_type) {
         default:
@@ -519,6 +557,10 @@ static QINLINE void qt_loop_balance_inner(const size_t       start,
     size_t                           iterend        = start;
     unsigned                         internal_flags = 0;
 
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+    aligned_t loop_barrier = maxworkers;
+#endif
+
     assert(func);
     assert(qwa);
     assert(qthread_library_initialized);
@@ -568,6 +610,13 @@ static QINLINE void qt_loop_balance_inner(const size_t       start,
         qwa[i].level        = 0;
         qwa[i].spawnthreads = maxworkers;
         qwa[i].sync_type    = sync_type;
+#ifdef USING_QT_LOOP_BALANCE_BARRIER
+        if (qt_internal_get_env_num("LOOP_BALANCE_BARRIER", 1, 0)) {
+            qwa[i].loop_barrier = &loop_barrier;
+        } else {
+            qwa[i].loop_barrier = NULL;
+        }
+#endif
         switch (sync_type) {
             case SYNCVAR_T:
                 sync.syncvar[i] = SYNCVAR_EMPTY_INITIALIZER;
@@ -645,7 +694,20 @@ void API_FUNC qt_loop_balance(const size_t    start,
                               const qt_loop_f func,
                               void           *argptr)
 {                                      /*{{{ */
+#ifdef LOOP_BALANCE_PROFILE
+    printf("Start:%lu, Stop:%lu\n", start, stop);
+    qtimer_t time_loop_balance_start = qtimer_create();
+    qtimer_start(time_loop_balance_start);
+    printf("time_loop_balance: start: %f\n", qtimer_wtime());
+#endif
     qt_loop_balance_inner(start, stop, func, argptr, 0, DONECOUNT);
+#ifdef LOOP_BALANCE_PROFILE
+    qtimer_stop(time_loop_balance_start);
+    double secs = qtimer_secs(time_loop_balance_start);
+    printf("time_loop_balance: stop: %f\n", qtimer_wtime());
+    printf("time_loop_balance: total: %f\n", secs);
+    qtimer_destroy(time_loop_balance_start);
+#endif
 }                                      /*}}} */
 
 void API_FUNC qt_loop_balance_simple(const size_t    start,
