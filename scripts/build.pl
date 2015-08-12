@@ -15,6 +15,7 @@ my %config = (
     compat        => 'CFLAGS="-m32" CXXFLAGS="-m32" LDFLAGS="-m32" CPPFLAGS="-m32"',
     unpooled      => '--disable-pooled-memory',
     opt           => 'CFLAGS="-O3" CXXFLAGS="-O3"',
+    sherwood       => '--with-scheduler=sherwood',
     nemesis       => '--with-scheduler=nemesis',
     lifo          => '--with-scheduler=lifo',
     mutexfifo     => '--with-scheduler=mutexfifo',
@@ -36,6 +37,13 @@ my %config = (
     oversubscription => '--enable-oversubscription',
     guard_pages => '--enable-guard-pages',
     chapel_default => '--enable-static --disable-shared --enable-condwait-queue --disable-spawn-cache --with-scheduler=nemesis',
+    # CHIUW 2015 configuration options
+    opt_phi => 'CFLAGS="-O3 -mmic" CXXFLAGS="-O3 -mmic" --host=mic-unknown-linux-gnu --enable-static --disable-shared',
+    libaff => '--with-topology=libaff',
+    disable_spawn_cache => '--disable-spawn-cache',
+    enable_spawn_cache => '--enable-spawn-cache',
+    disable_condwait_queue => '--disable-condwait-queue',
+    enable_condwait_queue => '--enable-condwait-queue',
 );
 
 my @summaries;
@@ -43,6 +51,7 @@ my @summaries;
 # Collect command-line options
 my @conf_names;
 my @check_tests;
+my $config_extras;
 my @user_configs;
 my $qt_src_dir = '';
 my $qt_bld_dir = '';
@@ -54,6 +63,7 @@ my $force_clean = 0;
 my $print_info = 0;
 my $dry_run = 0;
 my $quietly = 0;
+my $no_tests = 0;
 my $need_help = 0;
 
 if (scalar @ARGV == 0) {
@@ -66,6 +76,8 @@ if (scalar @ARGV == 0) {
             @conf_names = split(/,/, $1);
         } elsif ($flag =~ m/--with-config=(.*)/) {
             push @user_configs, $1;
+        } elsif ($flag =~ m/--with-config-extras=(.*)/) {
+            $config_extras = $1;
         } elsif ($flag =~ m/--source-dir=(.*)/) {
             $qt_src_dir = $1;
         } elsif ($flag =~ m/--build-dir=(.*)/) {
@@ -87,7 +99,8 @@ if (scalar @ARGV == 0) {
         } elsif ($flag eq '--quietly') {
             $quietly = 1;
         } elsif ($flag =~ m/--tests=(.*)/) {
-            @check_tests = split(/,/,$1) unless ($1 eq 'all')
+            @check_tests = split(/,/,$1) unless ($1 eq 'all');
+            $no_tests = 1 if ($1 eq 'none');
         } elsif ($flag eq '--help' || $flag eq '-h') {
             $need_help = 1;
         } else {
@@ -122,9 +135,14 @@ if ($need_help) {
     print "\t                        an unnamed 'config', whereas the previous\n";
     print "\t                        uses pre-defined, named configs. This option\n";
     print "\t                        can be used multiple times.\n";
+    print "\t--with-config-extras=<string> a user-specified string of configuration\n";
+    print "\t                        options that are appended to the end of each\n";
+    print "\t                        configure command.\n";
     print "\t--tests=<test-suite>    comma-separated list of test suites. Valid\n";
     print "\t                        test suites are 'basics', 'features', and\n";
-    print "\t                        'stress'. The default is to run all three.\n";
+    print "\t                        'stress'. Aliases 'all' and 'none' can be used\n";
+    print "\t                        to run all three or none of the test suites.\n";
+    print "\t                        The default is to run all three.\n";
     print "\t--source-dir=<dir>      absolute path to Qthreads source.\n";
     print "\t--build-dir=<dir>       absolute path to target build directory.\n";
     print "\t--install-dir=<dir>     absolute path to target installation directory.\n";
@@ -148,9 +166,14 @@ if ($need_help) {
 
 # Clean up and sanity check script options
 my $use_all = 0;
+my $use_chiuw2015 = 0;
 foreach my $name (@conf_names) {
     if ($name eq 'all') {
         $use_all = 1;
+    } elsif ($name eq 'chiuw2015') {
+        $use_chiuw2015 = 1;
+    } elsif ($name eq 'chiuw2015.phi') {
+        $use_chiuw2015 = 2;
     } elsif (not exists $config{$name}) {
         my @subconf_names = split(/\+/, $name);
         my @subconf_profiles = ();
@@ -168,6 +191,42 @@ foreach my $name (@conf_names) {
 }
 if ($use_all) {
     @conf_names = @default_conf_names;
+}
+if ($use_chiuw2015) {
+    my $base_options = "icc+libaff";
+    my @schedulers = ('nemesis', 'sherwood', 'mtsfifo', 'lifo');
+    my @sc = ('enable_spawn_cache', 'disable_spawn_cache');
+    my @cq = ('enable_condwait_queue', 'disable_condwait_queue');
+    my @chiuw2015_conf_names;
+ 
+    if (1 == $use_chiuw2015) {
+        $base_options = "$base_options+opt";
+    } else {
+        $base_options = "$base_options+opt_phi";
+    }
+
+    foreach my $scheduler (@schedulers) {
+        foreach my $sc_opt (@sc) {
+            foreach my $cq_opt (@cq) {
+                my $name = "$base_options+$scheduler+$sc_opt+$cq_opt";
+                my @subconf_names = split(/\+/, $name);
+                my @subconf_profiles = ();
+                foreach my $subname (@subconf_names) {
+                    if (exists $config{$subname}) {
+                        push @subconf_profiles, $config{$subname};
+                    } else {
+                        print "Invalid configuration option '$subname'\n";
+                        exit(1);
+                    }
+                }
+
+                $config{$name} = join(' ', @subconf_profiles);
+                push @chiuw2015_conf_names, $name;
+            }
+        }
+    }
+
+    @conf_names = @chiuw2015_conf_names
 }
 
 if ($qt_src_dir eq '') {
@@ -195,7 +254,7 @@ if ($qt_install_dir eq '') {
     exit(1);
 } else {
     foreach my $name (@conf_names) {
-        $config{$name} = join(' ', "--prefix=$qt_install_dir/$name");
+        $config{$name} = join(" ", ("--prefix=$qt_install_dir/$name ", $config{$name}));
     }
 }
 
@@ -246,7 +305,7 @@ sub run_tests {
     if (not $qt_install_dir eq '') {
         my_system("mkdir -p $qt_install_dir/$conf_name") if (not -e "$qt_install_dir/$conf_name");
     }
-    my_system("cd $test_dir && $qt_src_dir/configure $config{$conf_name} 2>&1 | tee $configure_log")
+    my_system("cd $test_dir && $qt_src_dir/configure $config{$conf_name} $config_extras 2>&1 | tee $configure_log")
         if ($force_configure || not -e "$test_dir/config.log");
     print "### Log: $configure_log\n" unless $quietly;
 
@@ -276,93 +335,95 @@ sub run_tests {
     }
 
     # Build testsuite
-    my %failcounts;
-    my $failing_tests = 0;
-    my $passing_tests = 0;
-    my $pass = 1;
-    while ($pass <= $repeat) {
-        print "###\tBuilding and testing '$conf_name' pass $pass ...\n"
-            unless $quietly;
-        my $results_log = "$test_dir/build.$pass.results.log";
-        print "### Log: $results_log\n" unless $quietly;
-        print "### Results for '$conf_name'\n" unless $quietly;
-        my $banner = '=' x 50;
-        print "$banner\n" unless $quietly;
+    if (0 == $no_tests) {
+        my %failcounts;
+        my $failing_tests = 0;
+        my $passing_tests = 0;
+        my $pass = 1;
+        while ($pass <= $repeat) {
+            print "###\tBuilding and testing '$conf_name' pass $pass ...\n"
+                unless $quietly;
+            my $results_log = "$test_dir/build.$pass.results.log";
+            print "### Log: $results_log\n" unless $quietly;
+            print "### Results for '$conf_name'\n" unless $quietly;
+            my $banner = '=' x 50;
+            print "$banner\n" unless $quietly;
 
-        my @make_test_suites = ('basics', 'features', 'stress');
-        if (scalar @check_tests == 0) { @check_tests = @make_test_suites};
-        foreach my $make_test_suite (@check_tests) {
-            my $check_command = "cd $test_dir";
-            $check_command .= " && make clean > /dev/null" if ($force_clean);
-            $check_command .= " && make $make_flags -C test/$make_test_suite check 2>&1 | tee $results_log";
-            my_system($check_command);
-            if (not $dry_run) {
-                my $check_warnings = qx/awk '\/warning:\/' $results_log/;
-                if (length $check_warnings > 0) {
-                    print "Build warnings in config $conf_name! Check log and/or run again with --force-clean and --verbose for more information.\n";
-                    print $check_warnings;
-                }
-                my $check_errors = qx/awk '\/error:\/' $results_log/;
-                if (length $check_errors > 0) {
-                    print "Build error in config $conf_name! Check log and/or run again with --verbose for more information.\n";
-                    print $check_errors;
-                    exit(1);
-                }
-
-                # Display filtered results
-                my $digest = qx/grep 'tests passed' $results_log/;
-                my $digest_msg = '';
-                if ($digest eq '') {
-                    $digest = qx/grep '# PASS:' $results_log/;
-                }
-                if ($digest eq '') {
-                    $digest = qx/grep 'tests failed' $results_log/; chomp($digest);
-                    $digest =~ /([0-9]+) of ([0-9]+) tests failed/;
-                    $failing_tests += $1;
-                    $passing_tests += $2 - $1;
-                    my $fails = qx/awk '\/FAIL\/{print \$2}' $results_log/;
-                    my $fail_list .= join(',', split(/\n/, $fails));
-                    foreach my $test (split(/\n/, $fails)) {
-                        $failcounts{$test} ++;
+            my @make_test_suites = ('basics', 'features', 'stress');
+            if (scalar @check_tests == 0) { @check_tests = @make_test_suites};
+            foreach my $make_test_suite (@check_tests) {
+                my $check_command = "cd $test_dir";
+                $check_command .= " && make clean > /dev/null" if ($force_clean);
+                $check_command .= " && make $make_flags -C test/$make_test_suite check 2>&1 | tee $results_log";
+                my_system($check_command);
+                if (not $dry_run) {
+                    my $check_warnings = qx/awk '\/warning:\/' $results_log/;
+                    if (length $check_warnings > 0) {
+                        print "Build warnings in config $conf_name! Check log and/or run again with --force-clean and --verbose for more information.\n";
+                        print $check_warnings;
                     }
-                    $digest_msg = $failing_tests . ' tests failed';
-                    $digest_msg .= " ($fail_list)";
-                } else {
-                    chomp $digest;
-                    $digest = qx/grep 'All .* tests passed' $results_log/;
+                    my $check_errors = qx/awk '\/error:\/' $results_log/;
+                    if (length $check_errors > 0) {
+                        print "Build error in config $conf_name! Check log and/or run again with --verbose for more information.\n";
+                        print $check_errors;
+                        exit(1);
+                    }
+
+                    # Display filtered results
+                    my $digest = qx/grep 'tests passed' $results_log/;
+                    my $digest_msg = '';
                     if ($digest eq '') {
-                        $digest = qx/grep 'TOTAL:' $results_log/;
-                        $digest =~ /TOTAL: ([0-9]+)/;
-                        $passing_tests += $1;
-                    } else {
-                        $digest =~ /All ([0-9]+) tests passed/;
-                        $passing_tests += $1;
+                        $digest = qx/grep '# PASS:' $results_log/;
                     }
-                    $digest_msg = $passing_tests . ' tests passed';
+                    if ($digest eq '') {
+                        $digest = qx/grep 'tests failed' $results_log/; chomp($digest);
+                        $digest =~ /([0-9]+) of ([0-9]+) tests failed/;
+                        $failing_tests += $1;
+                        $passing_tests += $2 - $1;
+                        my $fails = qx/awk '\/FAIL\/{print \$2}' $results_log/;
+                        my $fail_list .= join(',', split(/\n/, $fails));
+                        foreach my $test (split(/\n/, $fails)) {
+                            $failcounts{$test} ++;
+                        }
+                        $digest_msg = $failing_tests . ' tests failed';
+                        $digest_msg .= " ($fail_list)";
+                    } else {
+                        chomp $digest;
+                        $digest = qx/grep 'All .* tests passed' $results_log/;
+                        if ($digest eq '') {
+                            $digest = qx/grep 'TOTAL:' $results_log/;
+                            $digest =~ /TOTAL: ([0-9]+)/;
+                            $passing_tests += $1;
+                        } else {
+                            $digest =~ /All ([0-9]+) tests passed/;
+                            $passing_tests += $1;
+                        }
+                        $digest_msg = $passing_tests . ' tests passed';
+                    }
+                    print "$digest_msg - $make_test_suite\n" unless $quietly;
                 }
-                print "$digest_msg - $make_test_suite\n" unless $quietly;
             }
-        }
-        print "$banner\n" unless $quietly;
+            print "$banner\n" unless $quietly;
 
-        $pass++;
-    }
-    if (not $dry_run) {
-        my $summary = sprintf("%17s: ", $conf_name);
-        if ($failing_tests eq 0) {
-            $summary .= "All $passing_tests tests passed";
-        } elsif ($passing_tests eq 0) {
-            $summary .= "All $failing_tests tests FAILED!!!";
-        } else {
-            $summary .= "$passing_tests test".(($passing_tests!=1)?"s":"")." passed, ";
-            $summary .= "$failing_tests test".(($failing_tests!=1)?"s":"")." failed (";
-            foreach my $test (keys(%failcounts)) {
-                $summary .= "$test:$failcounts{$test} ";
-            }
-            chop($summary);
-            $summary .= ")";
+            $pass++;
         }
-        push @summaries, $summary;
+        if (not $dry_run) {
+            my $summary = sprintf("%17s: ", $conf_name);
+            if ($failing_tests eq 0) {
+                $summary .= "All $passing_tests tests passed";
+            } elsif ($passing_tests eq 0) {
+                $summary .= "All $failing_tests tests FAILED!!!";
+            } else {
+                $summary .= "$passing_tests test".(($passing_tests!=1)?"s":"")." passed, ";
+                $summary .= "$failing_tests test".(($failing_tests!=1)?"s":"")." failed (";
+                foreach my $test (keys(%failcounts)) {
+                    $summary .= "$test:$failcounts{$test} ";
+                }
+                chop($summary);
+                $summary .= ")";
+            }
+            push @summaries, $summary;
+        }
     }
 }
 

@@ -308,11 +308,12 @@ AC_ARG_WITH([topology],
             [AS_HELP_STRING([--with-topology=[[topologylib]]],
                             [specify which topology interface to use. Supported
                              interfaces include hwloc, hwloc_v2, ariel, lgrp,
-                             libnuma, libnumaV2, mach, plpa, sys, and, tilera.])],
+                             libnuma, libnumaV2, mach, plpa, sys, and, tilera,
+                             libaff.])],
             [AS_IF([test "x$with_topology" = xyes],
                    [with_topology=none_specified])
              case "$with_topology" in
-                 hwloc|hwloc_v2|ariel|lgrp|libnuma|libnumaV2|mach|no|plpa|sys|tilera) ;;
+                 hwloc|hwloc_v2|ariel|lgrp|libnuma|libnumaV2|mach|no|plpa|sys|tilera|libaff) ;;
                  none_specified) ;;
                  *)
                  AC_MSG_ERROR([Unsupported topology library ($with_topology)])
@@ -1090,8 +1091,12 @@ AS_IF([test "x$qthread_topo" != xno],
       [AS_IF([test "x$qthread_topo" = "xnone_specified"],
              [qthread_topo=no])
        # First, check for hwloc, since it gives me the most portable/flexible/reliable/detailed information.
-       AS_IF([test "x$qthread_topo" = xno -o "x$qthread_topo" = xhwloc -o "x$qthread_topo" = xhwloc_v2 -o "x$qthread_topo" = xariel],
-             [QTHREAD_CHECK_HWLOC([AS_IF([test "x$qthread_topo" != xhwloc -a "x$qthread_topo" != xhwloc_v2 -a "x$qthread_topo" != xariel],
+       AS_IF([test "x$qthread_topo" = xno -o "x$qthread_topo" = xhwloc -o \
+       "x$qthread_topo" = xhwloc_v2 -o "x$qthread_topo" = xariel  -o \
+       "x$qthread_topo" = xlibaff],
+             [QTHREAD_CHECK_HWLOC([AS_IF([test "x$qthread_topo" != xhwloc -a \
+             "x$qthread_topo" != xhwloc_v2 -a "x$qthread_topo" != xariel -a \
+             "x$qthread_topo" != xlibaff],
                                          [qthread_topo=hwloc])],
                                   [AS_IF([test "x$qthread_topo" != xno],
                                          [AC_MSG_ERROR([Specified topology library ($qthread_topo) does not work.])])])])
