@@ -1,4 +1,18 @@
-# Release Candidate 1.11:
+# Release Candidate 1.12:
+
+- have code follow a common coding practice
+
+- have documentation for each
+
+- automate configuration
+
+- pluggable schedulers
+
+- travis-ci matrix
+
+- get typechef to fix ifdefs
+
+# Release Canntrdidate 1.11:
 
 - Rework Chapel FEB support to use new task-queue system.
 
