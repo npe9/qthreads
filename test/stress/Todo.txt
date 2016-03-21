@@ -1,0 +1,6 @@
+* make all of the tests have a common output format that I can use for graphs.
+
+* make the stats
+
+* make the program do things in a range that prints in something I can use for R
+
