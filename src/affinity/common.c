@@ -29,7 +29,7 @@ void INTERNAL qt_topology_init(qthread_shepherd_id_t * nshepherds,
                                           num_sheps * num_wps);
 
     /* Process common environment variables */
-    if (THREADQUEUE_POLICY_TRUE == qt_threadqueue_policy(SINGLE_WORKER)) {
+    if (sched->policy && THREADQUEUE_POLICY_TRUE == sched->policy(SINGLE_WORKER)) {
         if (0 == num_wps) {
             num_wps = 1;
         } else if (1 < num_wps) {
@@ -72,7 +72,7 @@ void INTERNAL qt_topology_init(qthread_shepherd_id_t * nshepherds,
         print_status("Using %i Workers per Shepherd\n", (int)num_wps);
     }
 
-    if (THREADQUEUE_POLICY_TRUE == qt_threadqueue_policy(SINGLE_WORKER)
+    if (sched->policy && THREADQUEUE_POLICY_TRUE == sched->policy(SINGLE_WORKER)
         && 1 != num_wps) {
         print_error("attempted to use %i workers per shepherd with scheduler that only supports 1 worker per shepherd.\n", (int)num_wps);
         exit(EXIT_FAILURE);

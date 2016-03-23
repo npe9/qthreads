@@ -18,7 +18,7 @@ void qthread_run_needed_task(syncvar_t *value)
 
     //  ucontext_t my_context;
 
-    if ((target = qt_threadqueue_dequeue_specific(shep->ready, value))) {
+    if (sched->dequeue_specific != NULL && (target = sched->dequeue_specific(shep->ready, value))) {
         // switch to task and run -- else missing and return
         //    qthread_t * t = n->value;
 

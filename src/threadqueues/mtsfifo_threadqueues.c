@@ -109,7 +109,7 @@ ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
 // ... and modified to use hazard ptrs according to
 // http://www.research.ibm.com/people/m/michael/ieeetpds-2004.pdf
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *mtsfifo_new(void)
 {                                      /*{{{ */
     qt_threadqueue_t *q = ALLOC_THREADQUEUE();
 
@@ -180,7 +180,7 @@ static qthread_t *qt_threadqueue_dequeue(qt_threadqueue_t *q)
     return p;
 }                                      /*}}} */
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL mtsfifo_free(qt_threadqueue_t *q)
 {                                      /*{{{ */
     while (q->head != q->tail) {
         qt_threadqueue_dequeue(q);
@@ -193,35 +193,7 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
     FREE_THREADQUEUE(q);
 }                                      /*}}} */
 
-#ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
-{
-    return NULL;
-}
-
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{
-    return 0;
-}
-
-int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
-                                                    qthread_t *restrict                t)
-{
-    return 0;
-}
-
-void INTERNAL qt_threadqueue_enqueue_cache(qt_threadqueue_t         *q,
-                                           qt_threadqueue_private_t *cache)
-{}
-
-void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c,
-                                            qt_threadqueue_filter_f            f)
-{}
-#endif /* ifdef QTHREAD_USE_SPAWNCACHE */
-
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+void INTERNAL mtsfifo_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {                                      /*{{{ */
     qt_threadqueue_node_t *tail;
@@ -280,13 +252,13 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
     hazardous_ptr(0, NULL); // release the ptr (avoid hazardptr resource exhaustion)
 }                           /*}}} */
 
-void qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+void mtsfifo_enqueue_yielded(qt_threadqueue_t *restrict q,
                                     qthread_t *restrict        t)
 {   /*{{{*/
     qt_threadqueue_enqueue(q, t);
 } /*}}}*/
 
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *mtsfifo_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              QUNUSED(active))
 {                                      /*{{{ */
@@ -316,6 +288,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
         hazardous_ptr(1, next_ptr);
 
         if (next_ptr == NULL) { // queue is empty
+                /* TODO(npe): clean this up! */
 #ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
             if (qthread_internal_incr(&q->fruitless, &q->fruitless_m, 1) > 1000) {
 # ifdef QTHREAD_USE_EUREKAS
@@ -373,7 +346,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
 }                                      /*}}} */
 
 /* walk queue removing all tasks matching this description */
-void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
+static void INTERNAL mtsfifo_filter(qt_threadqueue_t       *q,
                                     qt_threadqueue_filter_f f)
 {   /*{{{*/
     qt_threadqueue_node_t *curs, **ptr;
@@ -436,20 +409,7 @@ void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
     }
 } /*}}}*/
 
-/* some place-holder functions */
-void INTERNAL qthread_steal_stat(void)
-{}
-
-void INTERNAL qthread_steal_enable(void)
-{}
-
-void INTERNAL qthread_steal_disable(void)
-{}
-
-void INTERNAL qthread_cas_steal_stat(void)
-{}
-
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+static qthread_shepherd_id_t INTERNAL mtsfifo_choose_dest(qthread_shepherd_t * curr_shep)
 {
     qthread_shepherd_id_t dest_shep_id = 0;
 
@@ -467,13 +427,7 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     return dest_shep_id;
 }
 
-qthread_t INTERNAL * qt_threadqueue_dequeue_specific(qt_threadqueue_t * q,
-                                                     void             * value)
-{
-    return NULL;
-}
-
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
+size_t INTERNAL mtsfifo_policy(const enum threadqueue_policy policy)
 {
     switch (policy) {
         case SINGLE_WORKER:
@@ -482,5 +436,18 @@ size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
             return THREADQUEUE_POLICY_UNSUPPORTED;
     }
 }
+
+
+struct qthread_sched mtsfifo = {
+        .name = "mtsfifo",
+        .new = mtsfifo_new,
+        .free = mtsfifo_free,
+        .enqueue = mtsfifo_enqueue,
+        .enqueue_yielded = mtsfifo_enqueue_yielded,
+        .get_thread = mtsfifo_get_thread,
+        .filter = mtsfifo_filter,
+        .choose_dest = mtsfifo_choose_dest,
+        .policy = mtsfifo_policy
+};
 
 /* vim:set expandtab: */

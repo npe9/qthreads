@@ -128,34 +128,9 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
 } /*}}}*/
 
 #ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
-{   /*{{{*/
-    return NULL;
-} /*}}}*/
-
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
-
-int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
-                                                    qthread_t *restrict                t)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
-
-void INTERNAL qt_threadqueue_enqueue_cache(qt_threadqueue_t         *q,
-                                           qt_threadqueue_private_t *cache)
-{}
-
-void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c,
-                                            qt_threadqueue_filter_f            f)
-{}
 #endif /* ifdef QTHREAD_USE_SPAWNCACHE */
 
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+void INTERNAL fifo_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {   /*{{{*/
     qt_threadqueue_node_t *old, *new;
@@ -196,7 +171,7 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
 #endif
 } /*}}}*/
 
-void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+void INTERNAL fifo_enqueue_yielded(qt_threadqueue_t *restrict q,
                                              qthread_t *restrict        t)
 {   /*{{{*/
     assert(q);
@@ -204,9 +179,9 @@ void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
 
 #ifdef QTHREAD_LIFO_MULTI_DEQUEUER
     qthread_t *top = qt_threadqueue_dequeue(q);
-    qt_threadqueue_enqueue(q, t);
+    lifo_enqueue(q, t);
     if (top) {
-        qt_threadqueue_enqueue(q, top);
+        lifo_enqueue(q, top);
     }
 #else
     /* THIS is not safe for multiple dequeuers */
@@ -226,18 +201,18 @@ void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
         cursor->next = node;
         (void)qthread_incr(&(q->advisory_queuelen), 1);
     } else {
-        qt_threadqueue_enqueue(q, t);
+        lifo_enqueue(q, t);
     }
 #endif /* ifdef QTHREAD_LIFO_MULTI_DEQUEUER */
 } /*}}}*/
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
+ssize_t INTERNAL lifo_advisory_queuelen(qt_threadqueue_t *q)
 {   /*{{{*/
     assert(q);
     return q->advisory_queuelen;
 } /*}}}*/
 
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *lifo_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              QUNUSED(active))
 {   /*{{{*/
@@ -276,7 +251,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
 } /*}}}*/
 
 /* walk queue removing all tasks matching this description */
-void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
+void INTERNAL lifo_filter(qt_threadqueue_t       *q,
                                     qt_threadqueue_filter_f f)
 {   /*{{{*/
     qt_threadqueue_node_t *curs, **ptr;
@@ -318,20 +293,7 @@ void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
     }
 } /*}}}*/
 
-/* some place-holder functions */
-void INTERNAL qthread_steal_stat(void)
-{}
-
-void INTERNAL qthread_steal_enable(void)
-{}
-
-void INTERNAL qthread_steal_disable(void)
-{}
-
-void INTERNAL qthread_cas_steal_stat(void)
-{}
-
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+qthread_shepherd_id_t INTERNAL lifo_choose_dest(qthread_shepherd_t * curr_shep)
 {
     qthread_shepherd_id_t dest_shep_id = 0;
 
@@ -349,13 +311,7 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     return dest_shep_id;
 }
 
-qthread_t INTERNAL * qt_threadqueue_dequeue_specific(qt_threadqueue_t * q,
-                                                     void             * value)
-{
-    return NULL;
-}
-
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
+size_t INTERNAL lifo_policy(const enum threadqueue_policy policy)
 {
     switch (policy) {
         case SINGLE_WORKER:
@@ -364,5 +320,20 @@ size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
             return THREADQUEUE_POLICY_UNSUPPORTED;
     }
 }
+
+
+struct qthread_sched lifo = {
+  .name = "lifo",
+  .new = lifo_new,
+  .free = lifo_free,
+  .advisory_queuelen = lifo_advistory_queuelen,
+  .private_dequeue = lifo_private_dequeue,
+  .get_thread = lifo_get_thread,
+  .enqueue = lifo_enqueue,
+  .choose_dest = lifo_choose_dest,
+  .policy = lifo_policy,
+  .enqueue_yielded = lifo_enqueue_yielded,
+  .get_thread = lifo_get_thread,
+};
 
 /* vim:set expandtab: */

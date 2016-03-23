@@ -70,7 +70,7 @@ void INTERNAL qt_threadqueue_subsystem_init(void)
 } /*}}}*/
 #endif /* if defined(UNPOOLED_QUEUES) || defined(UNPOOLED) */
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
+ssize_t INTERNAL mutexfifo_advisory_queuelen(qt_threadqueue_t *q)
 {   /*{{{*/
     return qthread_internal_atomic_read_s(&q->advisory_queuelen, &q->advisory_queuelen_m);
 } /*}}}*/
@@ -86,7 +86,7 @@ ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
 /* functions to manage the thread queues */
 /*****************************************/
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *mutexfifo_new(void)
 {                                      /*{{{ */
     qt_threadqueue_t *q = ALLOC_THREADQUEUE();
 
@@ -136,7 +136,7 @@ static qthread_t *qt_threadqueue_dequeue(qt_threadqueue_t *q)
     return p;
 }                                      /*}}} */
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL mutexfifo_free(qt_threadqueue_t *q)
 {                                      /*{{{ */
     while (q->head != q->tail) {
         qt_threadqueue_dequeue(q);
@@ -148,35 +148,7 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
     FREE_THREADQUEUE(q);
 }                                      /*}}} */
 
-#ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
-{   /*{{{*/
-    return NULL;
-} /*}}}*/
-
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
-
-int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
-                                                    qthread_t *restrict                t)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
-
-void INTERNAL qt_threadqueue_enqueue_cache(qt_threadqueue_t         *q,
-                                           qt_threadqueue_private_t *cache)
-{}
-
-void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c,
-                                            qt_threadqueue_filter_f            f)
-{}
-#endif /* ifdef QTHREAD_USE_SPAWNCACHE */
-
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+void INTERNAL mutexfifo_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {                                      /*{{{ */
     qt_threadqueue_node_t *node;
@@ -194,7 +166,7 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
     (void)qthread_internal_incr_s(&q->advisory_queuelen, &q->advisory_queuelen_m, 1);
 }                                      /*}}} */
 
-void qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+void mutexfifo_enqueue_yielded(qt_threadqueue_t *restrict q,
                                     qthread_t *restrict        t)
 {   /*{{{*/
     qt_threadqueue_enqueue(q, t);
@@ -204,7 +176,7 @@ void qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
  * by allowing idle shepherds to sit for a while while still allowing for
  * low-overhead for busy shepherds. This is a hybrid approach: normally, it
  * functions as a spinlock, but if it spins too much, it waits for a signal */
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *mutexfifo_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              QUNUSED(active))
 {                                      /*{{{ */
@@ -223,7 +195,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
 }                                      /*}}} */
 
 /* walk queue removing all tasks matching this description */
-void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
+void INTERNAL mutexfifo_filter(qt_threadqueue_t       *q,
                                     qt_threadqueue_filter_f f)
 {   /*{{{*/
     QTHREAD_FASTLOCK_LOCK(&q->head_lock);
@@ -278,20 +250,7 @@ void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
     QTHREAD_FASTLOCK_UNLOCK(&q->head_lock);
 } /*}}}*/
 
-/* some place-holder functions */
-void INTERNAL qthread_steal_stat(void)
-{}
-
-void INTERNAL qthread_steal_enable(void)
-{}
-
-void INTERNAL qthread_steal_disable(void)
-{}
-
-void INTERNAL qthread_cas_steal_stat(void)
-{}
-
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+qthread_shepherd_id_t INTERNAL mutexfifo_choose_dest(qthread_shepherd_t * curr_shep)
 {
     qthread_shepherd_id_t dest_shep_id = 0;
 
@@ -309,13 +268,7 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     return dest_shep_id;
 }
 
-qthread_t INTERNAL * qt_threadqueue_dequeue_specific(qt_threadqueue_t * q,
-                                                     void             * value)
-{
-    return NULL;
-}
-
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
+size_t INTERNAL mutexfifo_policy(const enum threadqueue_policy policy)
 {
     switch (policy) {
         case SINGLE_WORKER:
@@ -324,5 +277,19 @@ size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
             return THREADQUEUE_POLICY_UNSUPPORTED;
     }
 }
+
+struct qthread_sched mtsfifo = {
+        .name = "mutexfifo",
+        .new = mutexfifo_new,
+        .free = mutexfifo_free,
+        .advisory_queuelen = mutexfifo_advistory_queuelen,
+        .enqueue = mutexfifo_enqueue,
+        .enqueue_yielded = mutexfifo_enqueue_yielded,
+        .get_thread = mutexfifo_get_thread,
+        .filter = mutexfifo_filter,
+        .choose_dest = mutexfifo_choose_dest,
+        .policy = mutexfifo_policy
+};
+
 
 /* vim:set expandtab: */

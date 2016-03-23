@@ -161,6 +161,7 @@ static inline void sanity_check_queue(qt_threadqueue_t *q)
 # define PARANOIA_ONLY(x)
 #endif /* ifndef QTHREAD_NO_ASSERTS */
 
+/* FIXME(npe): this should not be in an ifdef like this, I need to figure out how to fix this */
 /* Memory Management */
 #if defined(UNPOOLED_QUEUES) || defined(UNPOOLED)
 # define ALLOC_THREADQUEUE() (qt_threadqueue_t *)MALLOC(sizeof(qt_threadqueue_t))
@@ -172,7 +173,7 @@ static void qt_threadqueue_subsystem_shutdown(void)
     free_agged_tasks();
 }
 
-void INTERNAL qt_threadqueue_subsystem_init(void)
+void INTERNAL sherwood_init(void)
 {
     init_agged_tasks();
     steal_chunksize = qt_internal_get_env_num("STEAL_CHUNK", 0, 0);
@@ -198,7 +199,7 @@ static void qt_threadqueue_subsystem_shutdown(void)
     free_agged_tasks();
 } /*}}}*/
 
-void INTERNAL qt_threadqueue_subsystem_init(void)
+void INTERNAL sherwood_init(void)
 {   /*{{{*/
     init_agged_tasks();
     generic_threadqueue_pools.queues = qt_mpool_create_aligned(sizeof(qt_threadqueue_t),
@@ -210,8 +211,9 @@ void INTERNAL qt_threadqueue_subsystem_init(void)
 } /*}}}*/
 #endif /* if defined(UNPOOLED_QUEUES) || defined(UNPOOLED) */
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
+ssize_t INTERNAL sherwood_advisory_queuelen(qt_threadqueue_t *q)
 {   /*{{{*/
+/* FiXME(npe): factor into 64 bit and 32 bit versions? */
 #if ((QTHREAD_ASSEMBLY_ARCH == QTHREAD_AMD64) ||    \
     (QTHREAD_ASSEMBLY_ARCH == QTHREAD_IA64) ||      \
     (QTHREAD_ASSEMBLY_ARCH == QTHREAD_POWERPC64) || \
@@ -235,7 +237,7 @@ ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
 
 static QINLINE qt_threadqueue_node_t *qthread_steal(qthread_shepherd_t *thief_shepherd);
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *sherwood_new(void)
 {   /*{{{*/
     qt_threadqueue_t *q = ALLOC_THREADQUEUE();
 
@@ -259,7 +261,7 @@ extern qt_mpool generic_qthread_pool;
 # define FREE_QTHREAD(t) qt_mpool_free(generic_qthread_pool, t)
 #endif /* if defined(UNPOOLED_QTHREAD_T) || defined(UNPOOLED) */
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL sherwood_free(qt_threadqueue_t *q)
 {   /*{{{*/
     if (q->head != q->tail) {
         qthread_t *t;
@@ -296,7 +298,7 @@ static QINLINE int qt_threadqueue_isstealable(qthread_t *t)
 } /*}}}*/
 
 /* enqueue at tail */
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+static void INTERNAL sherwood_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {   /*{{{*/
     qt_threadqueue_node_t *node;
@@ -325,6 +327,7 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
     QTHREAD_TRYLOCK_UNLOCK(&q->qlock);
 } /*}}}*/
 
+/* TODO(npe): sherwood actually uses the spawn cache, I need to think of a way to incorporate/delete this into the structure base approach */
 #ifdef QTHREAD_USE_SPAWNCACHE
 int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict c, /* cache */
                                             qt_threadqueue_t *restrict         q, /* queue */
@@ -435,7 +438,7 @@ int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *re
 #endif /* ifdef QTHREAD_USE_SPAWNCACHE */
 
 /* yielded threads enqueue at head */
-void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+void INTERNAL sherwood_enqueue_yielded(qt_threadqueue_t *restrict q,
                                              qthread_t *restrict        t)
 {   /*{{{*/
     qt_threadqueue_node_t *node;
@@ -697,7 +700,7 @@ void INTERNAL qt_add_first_agg_task(qthread_t             *agg_task,
 }
 
 /* dequeue at tail */
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *sherwood_get_thread(qt_threadqueue_t         *q,
 #ifdef QTHREAD_LOCAL_PRIORITY
                                             qt_threadqueue_t         *lpq,
 #endif /* ifdef QTHREAD_LOCAL_PRIORITY */
@@ -1367,7 +1370,7 @@ fixup_on_deck:
 #endif /* ifdef QTHREAD_USE_SPAWNCACHE */
 
 /* walk queue removing all tasks matching this description */
-void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
+void INTERNAL sherwood_filter(qt_threadqueue_t       *q,
                                     qt_threadqueue_filter_f f)
 {   /*{{{*/
     qt_threadqueue_node_t *node = NULL;
@@ -1497,7 +1500,7 @@ void INTERNAL qthread_steal_disable()
     steal_disable = 1;
 }     /*}}}*/
 
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+qthread_shepherd_id_t INTERNAL sherwood_choose_dest(qthread_shepherd_t * curr_shep)
 {
     if (curr_shep) {
         return curr_shep->shepherd_id;
@@ -1506,12 +1509,17 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     }
 }
 
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
-{
-    switch (policy) {
-        default:
-            return THREADQUEUE_POLICY_UNSUPPORTED;
-    }
-}
+struct qthread_sched sherwood = {
+        .name = "sherwood",
+        .init = sherwood_init,
+        .new = sherwood_new,
+        .free = sherwood_free,
+        .advisory_queuelen = sherwood_advisory_queuelen,
+        .enqueue = sherwood_enqueue,
+        .enqueue_yielded = sherwood_enqueue_yielded,
+        .get_thread = sherwood_get_thread,
+        .filter = sherwood_filter,
+        .choose_dest = sherwood_choose_dest,
+};
 
 /* vim:set expandtab: */

@@ -531,9 +531,9 @@ static void *qthread_master(void *arg)
             SPINLOCK_BODY();
         }
 #ifdef QTHREAD_LOCAL_PRIORITY
-        t = qt_scheduler_get_thread(threadqueue, localpriorityqueue, localqueue, QTHREAD_CASLOCK_READ_UI(me->active));
+        t = sched->get_thread(threadqueue, localpriorityqueue, localqueue, QTHREAD_CASLOCK_READ_UI(me->active));
 #else
-        t = qt_scheduler_get_thread(threadqueue, localqueue, QTHREAD_CASLOCK_READ_UI(me->active));
+        t = sched->get_thread(threadqueue, localqueue, QTHREAD_CASLOCK_READ_UI(me->active));
 #endif /* ifdef QTHREAD_LOCAL_PRIORITY */
         assert(t);
 #ifdef QTHREAD_SHEPHERD_PROFILING
@@ -1060,7 +1060,11 @@ int API_FUNC qthread_initialize(void)
     qthread_queue_subsystem_init();
     qt_feb_subsystem_init(need_sync);
     qt_syncvar_subsystem_init(need_sync);
-    qt_threadqueue_subsystem_init();
+    for(l = &sched_list; *l; l = l->next)
+      if(strcmp(l->name, schedname) == 0)
+        sched = *l;
+    if(sched->init != NULL)
+      sched->init();
     qt_blocking_subsystem_init();
 
 /* Set up agg methods*/
@@ -1477,10 +1481,12 @@ void API_FUNC qthread_finalize(void)
     }
 #endif
 # ifdef STEAL_PROFILE
-    qthread_steal_stat();
+    if(sched->steal_stat != NULL)
+      sched->steal_stat();
 # endif
 # ifdef CAS_STEAL_PROFILE
-    qthread_cas_steal_stat();
+    if(sched->cas_steal_stat != NULL)
+      sched->cas_steal_stat();
     // outstanding threads remain
     // free(qlib->cas_steal_profile);
     qlib->cas_steal_profile = NULL;
@@ -2556,7 +2562,9 @@ int API_FUNC qthread_spawn(qthread_f             f,
     if (target_shep != NO_SHEPHERD) {
         dest_shep = target_shep % qlib->nshepherds;
     } else {
-        dest_shep = qt_threadqueue_choose_dest(myshep);
+	    /* XXX(npe) what is the default value here? */
+	    if (sched->choose_dest)
+            dest_shep = sched->choose_dest(myshep);
 #ifdef QTHREAD_DEBUG
         // debug moved until after destination shepherd is picked for multithreaded shepherds
         // check to make sure destination shepherd is in range (not target_shep which is

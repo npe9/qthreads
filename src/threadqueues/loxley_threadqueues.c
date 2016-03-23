@@ -80,7 +80,7 @@ static QINLINE long       qthread_steal_chunksize(void);
 static QINLINE long       qthread_bias_penalty(void);
 static QINLINE qthread_t *qthread_steal(qt_threadqueue_t *thiefq);
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *loxley_new(void)
 {   /*{{{*/
     int               i;
     int               local_length = qlib->nworkerspershep + 1;
@@ -107,7 +107,7 @@ qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
     return q;
 }   /*}}}*/
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL loxley_free(qt_threadqueue_t *q)
 {   /*{{{*/
     int i;
     int local_length = qlib->nworkerspershep + 1;
@@ -121,13 +121,14 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
     free(q);
 } /*}}}*/
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
+ssize_t INTERNAL loxley_advisory_queuelen(qt_threadqueue_t *q)
 {   /*{{{*/
     ssize_t retval;
 
     QTHREAD_TRYLOCK_LOCK(&q->trylock);
     retval = qt_stack_size(&q->shared_stack);
     QTHREAD_TRYLOCK_UNLOCK(&q->trylock);
+    /* BUG(npe): After all this trouble to set up the retval we don't return it? */
     return 0;
 } /*}}}*/
 
@@ -142,29 +143,10 @@ static QINLINE qthread_worker_id_t qt_threadqueue_worker_id(void)
     return(id);
 }
 
-#ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
-{
-    return NULL;
-}
-
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{
-    return 0;
-}
-
-int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
-                                                    qthread_t *restrict                t)
-{
-    return 0;
-}
-
-#endif /* ifdef QTHREAD_USE_SPAWNCACHE */
+/* TODO(npe): I think the spawncache should be factored out */
 
 /* enqueue at tail */
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+void INTERNAL loxley_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {   /*{{{*/
     int                     id    = qt_threadqueue_worker_id();
@@ -220,7 +202,7 @@ void INTERNAL qt_threadqueue_enqueue_multiple(qt_threadqueue_t   *q,
 } /*}}}*/
 
 /* yielded threads enqueue at head */
-void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+void INTERNAL loxley_enqueue_yielded(qt_threadqueue_t *restrict q,
                                              qthread_t *restrict        t)
 {   /*{{{*/
     QTHREAD_TRYLOCK_LOCK(&q->trylock);
@@ -265,7 +247,7 @@ extern int threadsPowerActivePerSocket;
 #endif
 
 /* dequeue at tail, unlike original qthreads implementation */
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *loxley_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              active)
 {   /*{{{*/
@@ -511,14 +493,6 @@ static QINLINE qthread_t *qthread_steal(qt_threadqueue_t *thiefq)
     return(NULL);
 }   /*}}}*/
 
-/* walk queue looking for a specific value  -- if found remove it (and start
- * it running)  -- if not return NULL
- */
-qthread_t INTERNAL *qt_threadqueue_dequeue_specific(qt_threadqueue_t *q,
-                                                    void             *value)
-{   /*{{{*/
-    return (NULL);
-}   /*}}}*/
 
 void INTERNAL qthread_steal_enable()
 {   /*{{{*/
@@ -571,26 +545,8 @@ void INTERNAL qthread_steal_stat(void)
     }
 }
 
-#endif  /* ifdef STEAL_PROFILE */
-
-void qt_threadqueue_filter(qt_threadqueue_t       *q,
-                                    qt_threadqueue_filter_f f)
-{
-  printf("filter called");
-}
-
-void qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c,
-                                            qt_threadqueue_filter_f            f)
-{
-  printf("priv filter called");
-}
-void INTERNAL qt_threadqueue_enqueue_cache(qt_threadqueue_t         *q,
-                                           qt_threadqueue_private_t *cache)
-{
-  printf("enqueue cache called");
-}
-
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+/* XXX(npe) I bet I could null this and ignore it */
+qthread_shepherd_id_t INTERNAL loxley_choose_dest(qthread_shepherd_t * curr_shep)
 {
     if (curr_shep) {
         return curr_shep->shepherd_id;
@@ -599,12 +555,17 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     }
 }
 
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
-{
-    switch (policy) {
-        default:
-            return THREADQUEUE_POLICY_UNSUPPORTED;
-    }
-}
+
+struct qthread_sched loxley = {
+  .name = "loxley",
+  .new = loxley_new,
+  .free = loxley_free,
+  .advisory_queuelen = loxley_advistory_queuelen,
+  .enqueue = loxley_enqueue,
+  .choose_dest = loxley_choose_dest,
+  .enqueue_yielded = loxley_enqueue_yielded,
+  .get_thread = loxley_get_thread,
+};
+
 
 /* vim:set expandtab: */

@@ -1,0 +1,41 @@
+Make a structure
+also figure out a way to make nulled functions a no-op.
+
+Need to define initializers.
+     
+figure out how to deal with nulled function pointers.
+
+so for those guyes it's
+
+To make the ifdefs go away.
+
+Need to reference glibc and other gnu libs to see the difference between how they initialize and set flags. Particularly nptl.
+
+so that is interestinign.
+so you have to free a threadqueue.
+so is taht what you really want?
+
+We can get the state.
+what else are we doing here?
+
+So what are
+
+so that is the rcr tool
+
+So I need to set up the initializers.
+
+So you have the pools. The pools can also be the pseudo object oreiented approach.
+
+so the same thing with the spawn cache.
+make it a pseudo object. If it's null, then we're fine.
+
+so we have a multi-dequeuer too
+handle that later
+
+just handle that ourself.
+Make eurekas a runtime flag.
+
+Make all of the functions in the threadqueues static
+
+rename sched to tq
+

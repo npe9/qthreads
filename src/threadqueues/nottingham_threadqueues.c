@@ -105,10 +105,6 @@ static void cas_profile_update(int id,
 # define cas_profile_update(x, y) do {} while(0)
 #endif /* ifdef CAS_STEAL_PROFILE */
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
 
 /*****************************************/
 /* functions to manage the thread queues */
@@ -117,7 +113,7 @@ ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
 static QINLINE long       qthread_steal_chunksize(void);
 static QINLINE qthread_t *qthread_steal(qt_threadqueue_t *thiefq);
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *nottingham_new(void)
 {   /*{{{*/
     qt_threadqueue_t *q;
 
@@ -143,7 +139,7 @@ qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
     return q;
 } /*}}}*/
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL nottingham_free(qt_threadqueue_t *q)
 {   /*{{{*/
     // mspiegel: is it necessary to drain the queue?
     /* while (q->head != q->tail) {
@@ -159,6 +155,7 @@ static QINLINE int qt_threadqueue_cas128(uint128_t *src,
 {   /*{{{*/
     char result;
 
+    /* TODO(npe): see how to cross compile this? probably factor it into a file */
     // (AT&T syntax)
     __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
                           "setz %7; "
@@ -207,29 +204,8 @@ static QINLINE void qt_threadqueue_finish(qt_threadqueue_t      *q,
                           (uint128_t *)&oldnode, (uint128_t *)&top_entry);
 } /*}}}*/
 
-#ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
-{
-    return NULL;
-}
-
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{
-    return 0;
-}
-
-int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
-                                                    qthread_t *restrict                t)
-{
-    return 0;
-}
-
-#endif /* ifdef QTHREAD_USE_SPAWNCACHE */
-
 /* enqueue at tail */
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+void INTERNAL nemesis_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {   /*{{{*/
     qt_threadqueue_union_t oldtop, snapshot, lastchance;
@@ -386,7 +362,7 @@ void INTERNAL qt_threadqueue_resize_and_enqueue(qt_threadqueue_t *q,
 } /*}}}*/
 
 /* yielded threads enqueue at head */
-void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+void INTERNAL nottingham_enqueue_yielded(qt_threadqueue_t *restrict q,
                                              qthread_t *restrict        t)
 {   /*{{{*/
     int id = qthread_worker_unique(NULL);
@@ -465,7 +441,7 @@ qthread_t static QINLINE *qt_threadqueue_dequeue_helper(qt_threadqueue_t *q)
 }
 
 /* dequeue at tail, unlike original qthreads implementation */
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *nottingham_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              active)
 {   /*{{{*/
@@ -897,6 +873,7 @@ void INTERNAL qthread_steal_disable()
     }
 }   /*}}}*/
 
+/* FIXME(npe): I don't like this */
 #if 0 // begin test code, because this function
       // can't go in the test suite as it calls internal functions
 
@@ -959,7 +936,7 @@ int qt_threadqueue_test()
 // end test code
 #endif /* if 0 */
 
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+qthread_shepherd_id_t INTERNAL nottingham_choose_dest(qthread_shepherd_t * curr_shep)
 {
     if (curr_shep) {
         return curr_shep->shepherd_id;
@@ -968,12 +945,16 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     }
 }
 
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
-{
-    switch (policy) {
-        default:
-            return THREADQUEUE_POLICY_UNSUPPORTED;
-    }
-}
+
+struct qthread_sched nottingham = {
+        .name = "nottingham",
+        .new = nottingham_new,
+        .free = nottingham_free,
+        .enqueue = nottingham_enqueue,
+        .enqueue_yielded = nottingham_enqueue_yielded,
+        .get_thread = nottingham_get_thread,
+        .choose_dest = nottingham_choose_dest,
+};
+
 
 /* vim:set expandtab: */

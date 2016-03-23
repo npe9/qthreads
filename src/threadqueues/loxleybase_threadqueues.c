@@ -43,7 +43,6 @@ void INTERNAL qt_threadqueue_enqueue_multiple(qt_threadqueue_t   *q,
                                               qthread_t         **stealbuffer,
                                               qthread_shepherd_t *shep);
 
-void INTERNAL qt_threadqueue_subsystem_init(void) {}
 
 /*****************************************/
 /* functions to manage the thread queues */
@@ -52,7 +51,7 @@ void INTERNAL qt_threadqueue_subsystem_init(void) {}
 static QINLINE long       qthread_steal_chunksize(void);
 static QINLINE qthread_t *qthread_steal(qt_threadqueue_t *thiefq);
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *loxleybase_new(void)
 {   /*{{{*/
     qt_threadqueue_t *q;
 
@@ -68,13 +67,13 @@ qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
     return q;
 }   /*}}}*/
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL loxleybase_free(qt_threadqueue_t *q)
 {   /*{{{*/
     qt_stack_free(&q->stack);
     free((void *)q);
 } /*}}}*/
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
+ssize_t INTERNAL loxleybase_advisory_queuelen(qt_threadqueue_t *q)
 {   /*{{{*/
     ssize_t retval;
 
@@ -85,16 +84,11 @@ ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
 } /*}}}*/
 
 #ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
+qthread_t INTERNAL *loxleybase_private_dequeue(qt_threadqueue_private_t *c)
 {
     return NULL;
 }
 
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{
-    return 0;
 }
 
 int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
@@ -158,7 +152,7 @@ qthread_t static QINLINE *qt_threadqueue_dequeue_helper(qt_threadqueue_t *q)
 }
 
 /* dequeue at tail, unlike original qthreads implementation */
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *loxleybase_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              active)
 {   /*{{{*/
@@ -250,9 +244,8 @@ static int qt_threadqueue_steal(qt_threadqueue_t *victim_queue,
 
     qt_threadqueue_enqueue_unstealable(stack, nostealbuffer, amtNotStolen, index);
 
-#ifdef STEAL_PROFILE    // should give mechanism to make steal profiling optional
-    qthread_incr(&victim_queue->steal_amount_stolen, amtStolen);
-#endif
+    if(profile_stealing)
+      qthread_incr(&victim_queue->steal_amount_stolen, amtStolen);
 
     return(amtStolen);
 }
@@ -319,17 +312,8 @@ static QINLINE qthread_t *qthread_steal(qt_threadqueue_t *thiefq)
     return(NULL);
 }   /*}}}*/
 
-/* walk queue looking for a specific value  -- if found remove it (and start
- * it running)  -- if not return NULL
- */
-qthread_t INTERNAL *qt_threadqueue_dequeue_specific(qt_threadqueue_t *q,
-                                                    void             *value)
-{   /*{{{*/
-    return (NULL);
-}   /*}}}*/
 
-#ifdef STEAL_PROFILE  // should give mechanism to make steal profiling optional
-void INTERNAL qthread_steal_stat(void)
+void INTERNAL loxleybase_steal_stat(void)
 {
     int i;
 
@@ -346,16 +330,21 @@ void INTERNAL qthread_steal_stat(void)
     }
 }
 
-#endif  /* ifdef STEAL_PROFILE */
-
 /* some place-holder functions */
 void INTERNAL qthread_steal_enable(void)
 {}
 
-void INTERNAL qthread_steal_disable(void)
-{}
 
-void INTERNAL qthread_cas_steal_stat(void)
-{}
 
+struct qthread_sched loxleybase = {
+  .name = "loxleybase",
+  .new = loxleybase_new,
+  .free = loxleybase_free,
+  .advisory_queuelen = loxleybase_advistory_queuelen,
+  .private_dequeue = loxleybase_private_dequeue,
+  .enqueue = loxleybase_enqueue,
+  .enqueue_yielded = loxleybase_enqueue_yielded,
+  .get_thread = loxleybase_get_thread,
+  .steal_stat = loxleybase_steal_stat
+};
 /* vim:set expandtab: */

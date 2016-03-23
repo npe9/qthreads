@@ -82,7 +82,7 @@ static void qt_threadqueue_subsystem_shutdown(void)
     qt_mpool_destroy(generic_threadqueue_pools.nodes);
 } /*}}}*/
 
-void INTERNAL qt_threadqueue_subsystem_init(void)
+void INTERNAL nemesis_init(void)
 {   /*{{{*/
     generic_threadqueue_pools.queues = qt_mpool_create(sizeof(qt_threadqueue_t));
     generic_threadqueue_pools.nodes  = qt_mpool_create_aligned(sizeof(qt_threadqueue_node_t), 8);
@@ -92,7 +92,7 @@ void INTERNAL qt_threadqueue_subsystem_init(void)
 
 /* Thankfully, NEMESIS does not suffer from the ABA problem. */
 
-qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
+qt_threadqueue_t INTERNAL *nemesis_new(void)
 {                                      /*{{{ */
     qt_threadqueue_t *q = ALLOC_THREADQUEUE();
 
@@ -182,7 +182,7 @@ static qthread_t *qt_threadqueue_dequeue(qt_threadqueue_t *q)
     }
 }                                      /*}}} */
 
-void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
+void INTERNAL nemesis_free(qt_threadqueue_t *q)
 {                                      /*{{{ */
     assert(q);
     while (1) {
@@ -203,37 +203,10 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
     FREE_THREADQUEUE(q);
 }                                      /*}}} */
 
-#ifdef QTHREAD_USE_SPAWNCACHE
-qthread_t INTERNAL *qt_threadqueue_private_dequeue(qt_threadqueue_private_t *c)
-{   /*{{{*/
-    return NULL;
-} /*}}}*/
-
-int INTERNAL qt_threadqueue_private_enqueue(qt_threadqueue_private_t *restrict pq,
-                                            qt_threadqueue_t *restrict         q,
-                                            qthread_t *restrict                t)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
-
-int INTERNAL qt_threadqueue_private_enqueue_yielded(qt_threadqueue_private_t *restrict q,
-                                                    qthread_t *restrict                t)
-{   /*{{{*/
-    return 0;
-} /*}}}*/
-
-void INTERNAL qt_threadqueue_enqueue_cache(qt_threadqueue_t         *q,
-                                           qt_threadqueue_private_t *cache)
-{}
-
-void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c,
-                                            qt_threadqueue_filter_f            f)
-{}
-#endif /* ifdef QTHREAD_USE_SPAWNCACHE */
-
 void INTERNAL qthread_steal_enable() {}
 void INTERNAL qthread_steal_disable() {}
 
+/* TODO(npe) make this an option like malloc paranoia */
 #ifdef QTHREAD_PARANOIA
 static void sanity_check_tq(NEMESIS_queue *q)
 {   /*{{{*/
@@ -277,7 +250,7 @@ static void sanity_check_tq(NEMESIS_queue *q)
 
 #endif /* ifdef QTHREAD_PARANOIA */
 
-qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * curr_shep)
+qthread_shepherd_id_t INTERNAL nemesis_choose_dest(qthread_shepherd_t * curr_shep)
 {
     qthread_shepherd_id_t dest_shep_id = 0;
 
@@ -295,7 +268,7 @@ qthread_shepherd_id_t INTERNAL qt_threadqueue_choose_dest(qthread_shepherd_t * c
     return dest_shep_id;
 }
 
-void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
+void INTERNAL nemesis_enqueue(qt_threadqueue_t *restrict q,
                                      qthread_t *restrict        t)
 {                                      /*{{{ */
     qt_threadqueue_node_t *node, *prev;
@@ -336,19 +309,20 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
 #endif /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
 }                                      /*}}} */
 
-void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
+/* TODO(npe): make yielded default to enqueue if it's null? */
+void INTERNAL nemesis_enqueue_yielded(qt_threadqueue_t *restrict q,
                                              qthread_t *restrict        t)
 {                                      /*{{{ */
     qt_threadqueue_enqueue(q, t);
 }                                      /*}}} */
 
-ssize_t INTERNAL qt_threadqueue_advisory_queuelen(qt_threadqueue_t *q)
+ssize_t INTERNAL nemesis_advisory_queuelen(qt_threadqueue_t *q)
 {                                      /*{{{ */
     assert(q);
     return q->advisory_queuelen;
 }                                      /*}}} */
 
-qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
+qthread_t INTERNAL *nemesis_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              QUNUSED(active))
 {                                      /*{{{ */
@@ -395,7 +369,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
 }                                      /*}}} */
 
 /* walk queue removing all tasks matching this description */
-void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
+void INTERNAL nemesis_filter(qt_threadqueue_t       *q,
                                     qt_threadqueue_filter_f f)
 {   /*{{{*/
     NEMESIS_queue          tmp;
@@ -481,7 +455,7 @@ qthread_t INTERNAL * qt_threadqueue_dequeue_specific(qt_threadqueue_t * q,
     return NULL;
 }
 
-size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
+size_t INTERNAL nemesis_policy(const enum threadqueue_policy policy)
 {
     switch (policy) {
         case SINGLE_WORKER:
@@ -490,5 +464,21 @@ size_t INTERNAL qt_threadqueue_policy(const enum threadqueue_policy policy)
             return THREADQUEUE_POLICY_UNSUPPORTED;
     }
 }
+
+
+struct qthread_sched nemesis = {
+        .name = "nemsis",
+        .init = nemesis_init,
+        .new = nemesis_new,
+        .free = nemesis_free,
+        .advisory_queuelen = nemesis_advistory_queuelen,
+        .enqueue = nemesis_enqueue,
+        .enqueue_yielded = nemesis_enqueue_yielded,
+        .get_thread = nemesis_get_thread,
+        .filter = nemesis_filter,
+        .choose_dest = nemesis_choose_dest,
+        .policy = nemesis_policy
+};
+
 
 /* vim:set expandtab: */

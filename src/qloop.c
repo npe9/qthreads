@@ -441,7 +441,8 @@ static void qt_loop_step_inner(const size_t         start,
     if ((steps * stride) + start < stop) {
         steps++;
     }
-    qthread_steal_disable();
+    if(sched->steal_disable != NULL)
+      sched->steal_disable();
     aligned_t rootNum = qthread_barrier_id(); // what thread is the root of the tree?
 
 # ifdef QTHREAD_RCRTOOL
@@ -494,7 +495,7 @@ static void qt_loop_step_inner(const size_t         start,
     // doesn't work if back to master ever returns to this level -- need fork to have context to return to -- akp 10/31/12
 
     qt_sinc_wait(my_sinc, NULL);
-    qthread_steal_enable();
+    sched->steal_enable();
     FREE(qwa, sizeof(struct qloop_step_wrapper_args) * steps);
     qt_sinc_destroy(my_sinc);
     qt_barrier_destroy(barrier); // free internal barrier allocations

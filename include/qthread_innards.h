@@ -138,5 +138,22 @@ void INTERNAL qthread_exec(qthread_t    *t,
 extern int rcrSchedulingOff;
 #endif
 
+struct qthread_threadqueue {
+  char *name;
+  void (*init)(void)
+  qt_threadqueue_t* (*new)();
+  void (*free)(qt_threadqueue_t*);
+  ssize_t  (*advisory_queuelen)(qt_threadqueue_t*);
+  void (*private_dequeue)(qt_threadqueue_private_t *c);
+  qthread_t* (*get_thread)(qt_threadqueue_t*, qt_threadqueue_private_t*, uint_fast8_t);
+  void (*enqueue)(qt_threadqueue_t *restrict, qthread_t *restrict);
+  qthread_shepherd_id_t (*choose_dest)(qthread_shepherd_t*);
+  void (*enqueue_yielded)(qt_threadqueue_t *restrict, qthread_t *restrict);
+  void (*get_thread)(qt_threadqueue_t*, qt_threadqueue_private_t*, uint_fast8_t);
+  size_t (*policy)(const enum thread_policy)
+  void (*filter)(qt_threadqueue_t*, qt_threadqueue_filter_f);
+  void (*steal_stat)();
+};
+
 #endif // ifndef QTHREAD_INNARDS_H
 /* vim:set expandtab: */
