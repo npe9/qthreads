@@ -16,18 +16,6 @@
 #include "qt_shepherd_innards.h"
 // #include "qt_qthread_struct.h"
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-void API_FUNC qthread_pack_workerid(const qthread_worker_id_t w,
-                                    const qthread_worker_id_t newId)
-{   /*{{{*/
-    int shep   = w % qlib->nshepherds;
-    int worker = w / qlib->nshepherds;
-
-    assert((shep < qlib->nshepherds));
-    assert((worker < qlib->nworkerspershep));
-    qlib->shepherds[shep].workers[worker].packed_worker_id = newId;
-} /*}}}*/
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
 
 int API_FUNC qthread_disable_worker(const qthread_worker_id_t w)
 {   /*{{{*/

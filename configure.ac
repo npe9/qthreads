@@ -341,15 +341,11 @@ AC_ARG_ENABLE([condwait-queue],
 AC_ARG_ENABLE([interfaces],
               [AS_HELP_STRING([--enable-interfaces=[[list]]],
                               [Comma separated list of compiler interfaces to
-                               support. Available interfaces include chapel and
-                               rose.])],
+                               support. Available interfaces include chapel.])],
               [for iface in $(echo "$enable_interfaces" | sed 's/,/ /g') ; do
                  case "$iface" in
                    chapel)
                      compile_chapel_interface=yes
-                     ;;
-                   rose)
-                     enable_rose_extensions=yes
                      ;;
                    *)
                      AC_MSG_ERROR([Unsupported interface ($iface) selected.])
@@ -358,26 +354,10 @@ AC_ARG_ENABLE([interfaces],
                done
                EXTRA_DISTCHECK_OPTIONS="$EXTRA_DISTCHECK_OPTIONS --enable-interfaces=$enable_interfaces"])
 
-AC_ARG_ENABLE([rose-extensions],
-              [AS_HELP_STRING([--enable-rose-extensions],
-                              [Enable some experimental extensions to qthreads
-                               that are designed to support integration with
-                               the ROSE compiler. Also enables the ROSE
-                               compiler interface.])],
-              [EXTRA_DISTCHECK_OPTIONS="$EXTRA_DISTCHECK_OPTIONS --enable-interfaces=rose"])
-
-AC_ARG_ENABLE([rose-log-barrier],
-              [],
-              [AC_MSG_WARN([Deprecated option; use --with-barrier=log])
-               with_barrier="log"])
 AC_ARG_ENABLE([log-barrier],
               [],
               [AC_MSG_WARN([Deprecated option; use --with-barrier=log])
                with_barrier="log"])
-
-AC_ARG_ENABLE([omp_affinity],
-              [AS_HELP_STRING([--enable-omp-affinity],
-                              [Enable experimental OpenMP affinity extensions (part of ROSE interface). Under development])])
 
 AC_ARG_ENABLE([third-party-benchmarks],
               [AS_HELP_STRING([--enable-third-party-benchmarks],
@@ -820,16 +800,6 @@ AS_IF([test "x$enable_valgrind" = "xyes"],
       [AC_CHECK_HEADERS([valgrind/memcheck.h],
                         [AC_DEFINE([QTHREAD_USE_VALGRIND], [1], [Use Valgrind Macros])])])
 
-AS_IF([test "x$enable_rose_extensions" = xyes],
-      [AC_DEFINE([QTHREAD_USE_ROSE_EXTENSIONS], [1], [Define to enable ROSE extensions])
-       AS_IF([test "x$with_scheduler" = "x"],
-             [with_scheduler="sherwood"])
-       AS_IF([test "x$with_scheduler" != "xsherwood" -a "x$with_scheduler" != "xnottingham" -a "x$with_scheduler" != "xloxley"],
-             [AC_MSG_ERROR([ROSE XOMP implementation *REQUIRES* the sherwood, nottingham, or loxley schedulers.])])])
-
-AS_IF([test "x$enable_hpctoolkit_support" = xyes],
-      [AC_DEFINE([QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING], [1], [Support HPCToolkit stack unwinding])])
-
 AS_IF([test "x$enable_aligncheck" = "xyes"],
       [],
       [AC_DEFINE([QTHREAD_NOALIGNCHECK], [1], [Do not check the alignment of synchronization addresses])
@@ -1154,7 +1124,6 @@ AM_CONDITIONAL([QTHREAD_TIMER_TYPE_MACH], [test "x$qthread_timer_type" = "xmach"
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_GETHRTIME], [test "x$qthread_timer_type" = "xgethrtime"])
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_ALTIX], [test "x$qthread_timer_type" = "xaltix"])
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_GETTIMEOFDAY], [test "x$qthread_timer_type" = "xgettimeofday"])
-AM_CONDITIONAL([COMPILE_ROSE_EXTENSIONS], [test "x$enable_rose_extensions" = "xyes"])
 AM_CONDITIONAL([COMPILE_RCRTOOL], [test "x$enable_rcrtool" = "xyes"])
 AM_CONDITIONAL([COMPILE_CHAPEL_INTERFACE], [test "x$compile_chapel_interface" = "xyes"])
 AM_CONDITIONAL([COMPILE_COMPAT_ATOMIC], [test "x$compile_compat_atomic" = "xyes"])
@@ -1189,10 +1158,7 @@ AC_CONFIG_FILES([Makefile
                  test/issues/Makefile
                  test/benchmarks/Makefile
                  test/benchmarks/mantevo/Makefile
-                 test/benchmarks/mantevo/hpccg/Makefile
-                 test/benchmarks/mantevo/hpccg_rose/Makefile
-                 test/benchmarks/rose_lulesh/Makefile
-                 test/benchmarks/rose_bots/Makefile])
+                 test/benchmarks/mantevo/hpccg/Makefile])
 AC_OUTPUT
 
 case "$qthread_cv_stack_size" in

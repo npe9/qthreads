@@ -54,10 +54,6 @@
 #include "qthread_innards.h"
 #include "qt_prefetch.h"
 #include "qt_barrier.h"
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-# include "qt_arrive_first.h"
-# include "qt_task_counter.h"
-#endif
 #ifdef QTHREAD_OMP_AFFINITY
 # include "omp_affinity.h"
 #endif
@@ -372,9 +368,6 @@ static QINLINE void alloc_rdata(qthread_shepherd_t *me,
         rdata->valgrind_stack_id = VALGRIND_STACK_REGISTER(stack, qlib->qthread_stack_size);
     }
 #endif
-#if defined(QTHREAD_USE_ROSE_EXTENSIONS) && defined(QTHREAD_OMP_AFFINITY)
-    rdata->child_affinity = OMP_NO_CHILD_TASK_AFFINITY;
-#endif
 } /*}}}*/
 
 #ifdef QTHREAD_RCRTOOL
@@ -545,9 +538,6 @@ static void *qthread_master(void *arg)
         }
 #endif
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-qt_run:
-#endif
 
         qthread_debug(THREAD_DETAILS,
                       "id(%u): dequeued thread %p: id %d/state %d\n",
@@ -724,19 +714,9 @@ qt_run:
                         break;
 
                     case QTHREAD_STATE_PARENT_UNBLOCKED:
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-                        {
-                            qthread_t *parent = t->parent;
-                            qthread_thread_free(t);
-                            t               = parent;
-                            t->thread_state = t->prev_thread_state;
-                            goto qt_run;
-                        }
-#else
                         qthread_debug(THREAD_DETAILS, "id(%u): thread in state %i; that's illegal!\n", my_id, t->thread_state);
                         assert(0);
                         break;
-#endif              /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
                     case QTHREAD_STATE_SYSCALL:
                         t->thread_state = QTHREAD_STATE_RUNNING;
                         qthread_debug(THREAD_DETAILS | IO_DETAILS | SHEPHERD_DETAILS,
@@ -1248,15 +1228,6 @@ int API_FUNC qthread_initialize(void)
 
     qthread_debug(CORE_DETAILS, "calling component init functions\n");
     qt_barrier_internal_init();
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-# ifdef QTHREAD_RCRTOOL
-    if (rcrtoollevel > 0) {
-        qt_global_barrier_init(qlib->nshepherds * qlib->nworkerspershep - 1, 0);
-    } else
-# endif
-    qt_global_barrier_init(qlib->nshepherds * qlib->nworkerspershep, 0);
-    qt_global_arrive_first_init(qthread_num_workers() - 1, 0);
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
 
 #ifdef QTHREAD_MULTINODE
     if (NULL != qt_internal_get_env_str("MULTINODE", NULL)) {
@@ -1528,10 +1499,6 @@ void API_FUNC qthread_finalize(void)
         }
     }
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-    qthread_debug(BARRIER_DETAILS, "destroying the global barrier\n");
-    qt_global_barrier_destroy();
-#endif
 #ifdef QTHREAD_SHEPHERD_PROFILING
     print_status("Shepherd 0 spent %f%% of the time idle, handling %lu threads\n",
                  shep0->idle_time / qtimer_secs(shep0->total_time) * 100.0,
@@ -2042,13 +2009,6 @@ static QINLINE qthread_t *qthread_thread_new(const qthread_f f,
     t->rdata = NULL;
     t->team  = team;
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-    t->id                    = 0;
-    t->currentParallelRegion = NULL;
-    t->task_counter          = 0;
-    t->parent                = NULL;
-    t->prev_thread_state     = QTHREAD_STATE_ILLEGAL;
-#endif
 
 #ifdef QTHREAD_NONLAZY_THREADIDS
     /* give the thread an ID number */
@@ -2142,18 +2102,6 @@ void qthread_thread_free(qthread_t *t)
     }
 }                      /*}}} */
 
-#ifdef QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING
-// in Rose only code -- call function with rose argument list
-// pulled from HPCToolkit externals
-
-int in_qthread_fence(void *addr);
-extern void *qthread_fence1;
-extern void *qthread_fence2;
-
-# define MONITOR_ASM_LABEL(name)             \
-    __asm__ __volatile__ (".globl " # name); \
-    __asm__ __volatile__ (# name ":")
-#endif /* ifdef QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING */
 
 void API_FUNC qthread_call_method(qthread_f f, void*arg, void* ret, uint16_t flags){
     if (ret) {
@@ -2189,9 +2137,6 @@ static void qthread_wrapper(unsigned int high,
 static void qthread_wrapper(void *ptr)
 {
     qthread_t *t = (qthread_t *)ptr;
-#endif
-#ifdef QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING
-    MONITOR_ASM_LABEL(qthread_fence1); // add label for HPCToolkit stack unwind
 #endif
 
     if (t->thread_state == QTHREAD_STATE_YIELDED) {
@@ -2285,29 +2230,6 @@ static void qthread_wrapper(void *ptr)
 
     t->thread_state = QTHREAD_STATE_TERMINATED;
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-    if ((t->parent != NULL) && (t->ret == NULL)) {
-        qthread_t *parent              = t->parent;
-        aligned_t *parent_task_counter = &(parent->task_counter);
-        aligned_t  newval, oldval, test;
-        oldval = *parent_task_counter;
-        while (1) {
-            assert(tcount_get_children(oldval) > 0);
-            aligned_t waiting  = tcount_get_waiting(oldval);
-            aligned_t children = tcount_get_children(oldval) - 1;
-            newval = tcount_create(waiting, children);
-            // atomic decrement cannot be used because
-            // the get_waiting() mask must be preserved
-            test = qthread_cas(parent_task_counter, oldval, newval);
-            if (test == oldval) { break; }
-            oldval = test;
-        }
-        if (newval == tcount_finished_state) {
-            while(parent->thread_state != QTHREAD_STATE_PARENT_BLOCKED) SPINLOCK_BODY();
-            t->thread_state = QTHREAD_STATE_PARENT_UNBLOCKED;
-        }
-    }
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
 
 #ifdef QTHREAD_COUNT_THREADS
     QTHREAD_FASTLOCK_LOCK(&effconcurrentthreads_lock);
@@ -2332,21 +2254,11 @@ static void qthread_wrapper(void *ptr)
      */
     qthread_debug(THREAD_BEHAVIOR, "tid %u exiting.\n",
                   t->thread_id);
-#ifdef QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING
-    MONITOR_ASM_LABEL(qthread_fence2); // add label for HPCToolkit stack unwind
-#endif
     if ((t->flags & QTHREAD_SIMPLE) == 0) {
         qthread_back_to_master2(t);
     }
 }                      /*}}} */
 
-#ifdef QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING
-int in_qthread_fence(void *addr)
-{
-    return (qthread_fence1 <= addr) && (addr >= qthread_fence2);
-}
-
-#endif
 
 /* This function means "run thread t". The second argument (c) is a pointer
  * to the current context. */
@@ -2629,37 +2541,10 @@ int API_FUNC qthread_spawn(qthread_f             f,
     } else {
         t->preconds = NULL;
     }
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-    t->id = save_target;
-    // target_shep;
-    /* used in barrier and arrive_first, NOT the
-     * thread-id may be extraneous in both when parallel
-     * region barriers in place (not will to pull it now
-     * maybe later) akp */
-#endif
     if (feature_flag & QTHREAD_SPAWN_SIMPLE) {
         t->flags |= QTHREAD_SIMPLE;
     }
     qthread_debug(THREAD_BEHAVIOR, "new-tid %u shep %u\n", t->thread_id, dest_shep);
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-    if (me != NULL) {
-        t->currentParallelRegion = me->currentParallelRegion; // saved in shepherd
-        if ((ret == NULL) && (feature_flag & QTHREAD_SPAWN_PARENT)) {
-            aligned_t next, previous, test;
-            t->parent = me;
-            previous  = me->task_counter;
-            while(1) {
-                assert(tcount_get_waiting(previous) == 0);
-                next = tcount_create(0, tcount_get_children(previous) + 1);
-                // atomic increment cannot be used because
-                // the get_waiting() mask must be preserved
-                test = qthread_cas(&me->task_counter, previous, next);
-                if (test == previous) { break; }
-                previous = test;
-            }
-        }
-    }
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
        /* Step 4: Prepare the return value location (if necessary) */
     if (ret) {
         int      test     = QTHREAD_SUCCESS;
@@ -3087,118 +2972,6 @@ int API_FUNC qthread_migrate_to(const qthread_shepherd_id_t shepherd)
     }
 }                      /*}}} */
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-/* These are just accessor functions */
-qt_barrier_t *qt_thread_barrier()            // get barrier active for this thread
-{                      /*{{{ */
-    return qt_parallel_region()->barrier;
-}                      /*}}} */
-# ifdef QTHREAD_USE_ROSE_EXTENSIONS
-/* These are just accessor functions */
-qt_barrier_t *qt_thread_barrier_resize(size_t size)  // resize barrier for current parallel region
-{                      /*{{{ */
-    qt_barrier_destroy(qt_parallel_region()->barrier);
-    qt_parallel_region()->barrier = qt_barrier_create(size, REGION_BARRIER);
-    return qt_parallel_region()->barrier;
-}                      /*}}} */
-# endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
-
-void INTERNAL qt_set_unstealable(void);
-void INTERNAL qt_set_unstealable()
-{                      /*{{{ */
-    qthread_t *t = qthread_internal_self();
-
-    t->flags |= QTHREAD_UNSTEALABLE;
-}                      /*}}} */
-
-/* These are just accessor functions */
-qthread_parallel_region_t *qt_parallel_region() // get active parallel region
-{                                               /*{{{ */
-    qthread_t *t = qthread_internal_self();
-
-    return t->currentParallelRegion;
-}                      /*}}} */
-
-struct qqloop_step_handle_t *qt_loop_rose_queue_create(int64_t start,
-                                                       int64_t stop,
-                                                       int64_t incr);
-// number of loops to allow concurrently active - unfinished because someone
-// is late starting is the normal reason more than 1 or 2
-// lowered when code to actually protect against reuse in place AKP 1/26/12
-# define QTHREAD_NUM_LOOP_STRUCT 16
-
-int qt_omp_parallel_region_create()
-{                      /*{{{ */
-    int                        ret = 0;
-    int                        workers;
-    qthread_parallel_region_t *pr = MALLOC(sizeof(qthread_parallel_region_t));
-
-    qassert_ret(pr, QTHREAD_MALLOC_ERROR);
-
-    workers = qthread_num_workers();
-
-    qt_barrier_t *gb = qt_barrier_create(workers, REGION_BARRIER); // allocate barrier for region (shepherds)
-
-    qthread_t *t = qthread_internal_self();
-    if (t->currentParallelRegion != NULL) { // we have nested parallelism
-        ret = 1;
-    }
-    pr->last                 = t->currentParallelRegion;
-    t->currentParallelRegion = pr;
-    pr->barrier              = gb;
-    pr->forLoop              = NULL;
-    pr->loopList             = NULL;
-
-    // create and initialize a fixed number of loop structures that
-    // will be used as a circular buffer to handle omp parallel for
-    // loops -- the number of different active for loops is specified
-    // by QTHREAD_NUM_LOOP_STRUCT which should be turned into an
-    // environment variable -- also we should check for the limit
-    // being hit and fail with a message rather than just giving
-    // wrong answers which may now be the case AKP 7/26/11
-
-    // Protection against reuse working AKP 1/26/12
-    pr->clsSize           = QTHREAD_NUM_LOOP_STRUCT;
-    pr->currentLoopNum    = MALLOC(sizeof(int) * workers);
-    pr->currentLoopStruct = MALLOC(sizeof(struct qqloop_step_handle_t *) * pr->clsSize);
-    int i;
-    for(i = 0; i < qthread_num_workers(); i++) {
-        pr->currentLoopNum[i] = 0;
-    }
-    for(i = 0; i < QTHREAD_NUM_LOOP_STRUCT; i++) {
-        pr->currentLoopStruct[i] = qt_loop_rose_queue_create(0, 0, 0);
-    }
-    return ret;
-}                              /*}}} */
-
-void INTERNAL qt_free_loop(void *lp);
-
-void qt_omp_parallel_region_destroy()
-{      /*{{{ */
-# if 0 // race condition on cleanup - commented out until found - akp 3/16/11
-       // it looks like one thread reaches cleanup code before completing loop
-       // I thought it was related to threads moving (affinity reduces the
-       // likelyhood of the hang -- but does not make it go away) but have not
-       // found it.
-    qthread_shepherd_t *myshep = qthread_internal_getshep();
-    if (!pr) { return; }
-    qt_free_loop(pr->loopList);
-
-    if (pr->barrier) {
-        qt_barrier_destroy(pr->barrier);
-    }
-    myshep->currentParallelRegion = pr->last;
-
-    FREE(pr);
-# endif /* if 0 */
-
-    qthread_t *t = qthread_internal_self();
-
-    qthread_parallel_region_t *pr = t->currentParallelRegion;
-    t->currentParallelRegion = pr->last;
-}                                      /*}}} */
-
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
 
 /* These are just accessor functions */
 unsigned int API_FUNC qthread_id(void)
@@ -3232,64 +3005,7 @@ unsigned int API_FUNC qthread_id(void)
 #endif /* ifdef QTHREAD_NONLAZY_THREADIDS */
 }                      /*}}} */
 
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-unsigned API_FUNC qthread_barrier_id(void)
-{                      /*{{{ */
-    assert(qthread_library_initialized);
-    qthread_t *t = qthread_internal_self();
 
-    qthread_debug(THREAD_CALLS, "tid(%u)\n",
-                  t ? t->id : QTHREAD_NON_TASK_ID);
-    if (t && (t->id == NO_SHEPHERD)) {
-        return qthread_internal_getshep()->shepherd_id;
-    }
-    return t ? t->id : QTHREAD_NON_TASK_ID;
-}                      /*}}} */
-
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
-
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-# ifdef __INTEL_COMPILER
-#  pragma warning (disable:1418)
-# endif
-
-int INTERNAL qthread_forCount(int inc)
-{                                    /*{{{ */
-    qthread_t *t = qthread_internal_self();
-
-    assert(t);
-    return (t->rdata->forCount += inc);
-}                                    /*}}} */
-
-void qthread_parent_yield_state(void)
-{   /*{{{*/
-    qthread_t *t = qthread_internal_self();
-
-    assert(t);
-    t->prev_thread_state = t->thread_state;
-    t->thread_state      = QTHREAD_STATE_PARENT_YIELD;
-    qthread_back_to_master(t);
-} /*}}}*/
-
-aligned_t *qthread_task_counter(void)
-{                      /*{{{ */
-    qthread_t *t = qthread_internal_self();
-
-    assert(t);
-    return &t->task_counter;
-}                      /*}}} */
-
-void qthread_set_affinity(unsigned int shep)
-{                                    /*{{{ */
-# ifdef QTHREAD_OMP_AFFINITY
-    qthread_t *t = qthread_internal_self();
-
-    assert(t);
-    t->rdata->child_affinity = shep;
-# endif
-}
-
-#endif /* ifdef QTHREAD_USE_ROSE_EXTENSIONS */
 
 void qt_set_barrier(qt_barrier_t *bar)
 {                      /*{{{ */
