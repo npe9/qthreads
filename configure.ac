@@ -99,11 +99,6 @@ AC_ARG_ENABLE([header-syscall-interception],
               [AS_HELP_STRING([--enable-header-syscall-interception],
                               [Intercept blocking syscalls by mangling them via #defs. Experimental.])])
 
-AC_ARG_ENABLE([rcrtool],
-              [AS_HELP_STRING([--enable-rcrtool],
-                              [Includes support for using qthreads with the
-                               RCRTool performance monitor. Experimental.])])
-
 AC_ARG_ENABLE([oversubscription],
               [AS_HELP_STRING([--enable-oversubscription],
                               [This option configures qthreads in a way that
@@ -175,7 +170,6 @@ AC_ARG_ENABLE([debug],
                                mpool,
                                multinode,
                                qarray,
-                               rcrtool,
                                shepherd,
                                syncvars,
                                syscalls,
@@ -184,7 +178,7 @@ AC_ARG_ENABLE([debug],
                                threadqueues,
                                xomp])],
               [AS_IF([test "x$enable_debug" = "xyes"],
-                     [enable_debug="affinity,threadqueues,thread,shepherd,core,team,mpool,syscalls,febs,syncvars,io,loops,barrier,qarray,rcrtool,futurelib,xomp,multinode,chapel"])
+                     [enable_debug="affinity,threadqueues,thread,shepherd,core,team,mpool,syscalls,febs,syncvars,io,loops,barrier,qarray,futurelib,xomp,multinode,chapel"])
                for area in $(echo "$enable_debug" | sed 's/,/ /g') ; do
                  case "$area" in
                      affinity) enable_debug_affinity=yes ;;
@@ -201,7 +195,6 @@ AC_ARG_ENABLE([debug],
                      loop|loops) enable_debug_loops=yes ;;
                      barrier|barriers) enable_debug_barrier=yes ;;
                      qarray|qarrays) enable_debug_qarray=yes ;;
-                     rcrtool) enable_debug_rcrtool=yes ;;
                      futurelib) enable_debug_futurelib=yes ;;
                      xomp) enable_debug_xomp=yes ;;
                      multinode) enable_debug_multinode=yes ;;
@@ -946,8 +939,6 @@ AS_IF([test "x$enable_debug" = x -o "x$enable_debug" = xno],
                       [QTHREAD_DEBUG_BARRIER], [prints out barrier debugging information at runtime])
        QT_COND_DEFINE([$enable_debug_qarray],
                       [QTHREAD_DEBUG_QARRAY], [prints out qarray debugging information at runtime])
-       QT_COND_DEFINE([$enable_debug_rcrtool],
-                      [QTHREAD_DEBUG_RCRTOOL], [prints out rcrtool debugging information at runtime])
        QT_COND_DEFINE([$enable_debug_futurelib],
                       [QTHREAD_DEBUG_FUTURELIB], [prints out futurelib debugging information at runtime])
        QT_COND_DEFINE([$enable_debug_xomp],
@@ -957,14 +948,6 @@ AS_IF([test "x$enable_debug" = x -o "x$enable_debug" = xno],
        QT_COND_DEFINE([$enable_debug_chapel],
                       [QTHREAD_DEBUG_CHAPEL], [prints out chapel interface debugging information at runtime])
        ])
-
-AS_IF([test "x$enable_rcrtool" = "xyes"],
-      [AC_DEFINE([QTHREAD_RCRTOOL], [1], [enables RCR logging and scheduling])],
-      [enable_rcrtool=no])
-
-AS_IF([test "x$enable_rcrtool_stats" = "xyes"],
-      [AC_DEFINE([QTHREAD_RCRTOOL_STAT], [1], [logs RCR stats])],
-      [enable_rcrtool_stats=no])
 
 AS_IF([test "x$enable_hardware_timer" != "xno"],
       [AC_LINK_IFELSE([AC_LANG_SOURCE([[
@@ -1124,7 +1107,6 @@ AM_CONDITIONAL([QTHREAD_TIMER_TYPE_MACH], [test "x$qthread_timer_type" = "xmach"
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_GETHRTIME], [test "x$qthread_timer_type" = "xgethrtime"])
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_ALTIX], [test "x$qthread_timer_type" = "xaltix"])
 AM_CONDITIONAL([QTHREAD_TIMER_TYPE_GETTIMEOFDAY], [test "x$qthread_timer_type" = "xgettimeofday"])
-AM_CONDITIONAL([COMPILE_RCRTOOL], [test "x$enable_rcrtool" = "xyes"])
 AM_CONDITIONAL([COMPILE_CHAPEL_INTERFACE], [test "x$compile_chapel_interface" = "xyes"])
 AM_CONDITIONAL([COMPILE_COMPAT_ATOMIC], [test "x$compile_compat_atomic" = "xyes"])
 AM_CONDITIONAL([COMPILE_SPAWNCACHE], [test "x$enable_spawn_cache" = "xyes"])
@@ -1231,7 +1213,6 @@ echo    "      Barrier Style: $with_barrier"
 echo    "   Dictionary Style: $with_dict"
 echo    "    Lazy Thread IDs: $enable_lazy_threadids"
 echo    "       Pools/caches: $pool_string"
-echo    "            RCRTool: $enable_rcrtool"
 echo    "Increments/CAS/FEBs: $incr_string, $feb_string"
 echo ""
 echo    "Miscellany:"

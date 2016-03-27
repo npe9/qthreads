@@ -22,9 +22,6 @@
 #include "qt_barrier.h"
 
 
-#ifdef QTHREAD_RCRTOOL
-int64_t maestro_size(void);
-#endif
 
 typedef enum {
     ALIGNED,
@@ -139,7 +136,6 @@ static aligned_t qloop_wrapper(struct qloop_wrapper_args *const restrict arg)
 
     return 0;
 }                                      /*}}} */
-
 
 struct qt_loop_spawner_arg {
     void      *argptr;
@@ -332,7 +328,6 @@ void API_FUNC qt_loop_sinc(size_t    start,
 {                                      /*{{{ */
     qt_loop_inner(start, stop, func, argptr, 0, SINC_T);
 }                                      /*}}} */
-
 
 #define QT_LOOP_BALANCE_SIMPLE (1 << 0)
 
