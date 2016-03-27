@@ -125,16 +125,7 @@ qthread_worker_id_t API_FUNC qthread_num_workers_local(qthread_shepherd_id_t she
 {                      /*{{{ */
     assert(qthread_library_initialized);
 
-#ifdef QTHREAD_RCRTOOL
-    if(shepherd_id == NO_SHEPHERD) {
-       qthread_worker_t *worker = (qthread_worker_t *)TLS_GET(shepherd_structs);
-       if(worker != NULL) {
-          shepherd_id = worker->shepherd->shepherd_id;
-    }
-    qlib->shepherds[shepherd_id].active_workers;
-#else
     return qlib->nworkerspershep;
-#endif
 }
 
 /* vim:set expandtab: */

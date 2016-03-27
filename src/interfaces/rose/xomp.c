@@ -41,11 +41,6 @@
 #include <rose_xomp.h>
 #include <rose_extensions.h>
 #include <rose_sinc_barrier.h>
-#ifdef QTHREAD_RCRTOOL
-#include "rcrtool/qt_rcrtool.h"
-#include "maestro_sched.h"
-int64_t maestro_change_size(void);
-#endif
 
 void qthread_set_affinity(unsigned int shep);
 
@@ -232,10 +227,6 @@ void XOMP_init(
     char *env;  // Used to get Envionment variables
     qthread_initialize();
 
-#ifdef QTHREAD_RCRTOOL
-    //Log the XOMP initialization and the application name into the RCRTool RAT Table.
-    rcrtool_log(RCR_APP_STATE_DUMP, XOMP_INIT, 0, 0, argv[0]);
-#endif
 
     XOMP_Status_init(&xomp_status);  // Initialize XOMP_Status
 
@@ -304,20 +295,7 @@ void XOMP_parallel_start(
     set_inside_xomp_parallel(&xomp_status, TRUE);
   }
 
-#ifdef QTHREAD_RCRTOOL
-  //Here we log entering an open MP section into the RCRTool RAT Table.
-  int numberOfThreads = numThread;
-  if (numberOfThreads == 0) numberOfThreads = qthread_num_workers();
-  rcrtool_log(RCR_APP_STATE_DUMP, XOMP_PARALLEL_START, numberOfThreads, (uint64_t) func, funcName);
-  
-  qthread_shepherd_id_t parallelWidth ;
-  if (rcrtoollevel <= 1) parallelWidth = qthread_num_workers()-1;
-  else parallelWidth = maestro_change_size();
-  
-  // allocate and set new feb barrier
-#else
   qthread_shepherd_id_t parallelWidth = qthread_num_workers();
-#endif
 
   int save_thread_cnt = 0;  // double duty - non-zero we changed thread count - value is the old thread count
   if (!ifClause) { //  if clause false don't start parallel region
@@ -347,10 +325,6 @@ void XOMP_parallel_end(
 {
     XOMP_taskwait();
 
-#ifdef QTHREAD_RCRTOOL
-    //Here we log leaving an open MP section into the RCRTool RAT Table.
-    rcrtool_log(RCR_APP_STATE_DUMP, XOMP_PARALLEL_END, -1, 0, 0);
-#endif
 
     set_inside_xomp_parallel(&xomp_status, FALSE);
     qt_omp_parallel_region_destroy();  //  need to free parallel region and all it contains
@@ -403,10 +377,6 @@ void xomp_internal_loop_init(
 		    int stride,
 		    int chunk_size)
 {
-#ifdef QTHREAD_RCRTOOL
-  //Here we log entering a loop section.
-  rcrtool_log(RCR_APP_STATE_DUMP, XOMP_FOR_LOOP_START, 0, (uint64_t)0, "");
-#endif
   qthread_parallel_region_t *pr = qt_parallel_region();
 
   // get barrier id
@@ -456,9 +426,6 @@ void xomp_internal_loop_init(
       aligned_t *myIteration = &lp->work_array + i;
       *myIteration = 0;
     }
-#ifdef QTHREAD_RCRTOOL
-    lp->allowed_workers = maestro_allowed_workers();
-#endif
     MACHINE_FENCE;
     lp->ready = loopNum;         // use the loop number to allow other workers to start 
   }
@@ -537,19 +504,6 @@ static bool xomp_internal_guided_next(
 {
     // spin waiting for either 
     qthread_shepherd_id_t myShepId = qthread_shep();
-#ifdef QTHREAD_RCRTOOL
-    if (rcrtoollevel > 1){ // has cache control been turned off by an environment variable?
-       if (loop->current_workers[myShepId] > maestro_current_workers(myShepId)) {
-	    qthread_incr(&loop->current_workers[myShepId],-1); // not working spinning
-	    while (((loop->current_workers[myShepId] + 1) > maestro_current_workers(myShepId)) // A) the number of workers to be increased
-		   && (!(loop->departed_workers))) {   // B loop done and workers departing
-	      SPINLOCK_BODY();
-	    }
-	    qthread_incr(&loop->current_workers[myShepId],1); // back at work  -- skipped in departed workers case OK since everyone leaving
-
-	}
-    }
-#endif
 
     int dynamicBlock = compute_XOMP_block(loop);
 
@@ -656,10 +610,6 @@ void XOMP_loop_end(
       XOMP_barrier(); // need barrier to make sure loop is freed after everyone has used it
     }
     */
-#ifdef QTHREAD_RCRTOOL
-    //Here we log exiting a loop section.
-    rcrtool_log(RCR_APP_STATE_DUMP, XOMP_FOR_LOOP_END, 0, (uint64_t)0, "");
-#endif
 }
 
 // Openmp parallel for loop is completed - nothing to do at the current time
@@ -959,11 +909,7 @@ void XOMP_loop_default(
     long *returnUpper)
 {
   qqloop_step_handle_t *loop = NULL;
-#ifdef QTHREAD_RCRTOOL 
-  aligned_t parallelWidth = maestro_size()-1;
-#else
   aligned_t parallelWidth = qthread_num_workers();
-#endif
   aligned_t chunksize ;
   if (stride > 0){ // normal case -- postive stride
     if (upper >= lower) {
@@ -1250,25 +1196,6 @@ void omp_set_num_threads (
         }
     }
 
-#ifdef QTHREAD_RCRTOOL
-  
-  if (qt_num_threads_requested != num_active){ 
-    // need to reset the barrier size and the first arrival size (if larger or smaller)
-    qtar_resize(qt_num_threads_requested);
-
-    if (qt_parallel_region()){
-      qt_thread_barrier_resize(qt_num_threads_requested);
-      qt_barrier_resize(qt_thread_barrier(), qt_num_threads_requested);
-    }
-    qthread_worker_id_t newId = 0;
-    for(i=0; i < qt_num_threads_requested; i++) {  // repack id's
-      qthread_pack_workerid(i,newId++);
-    }
-    if (workerid >= qt_num_threads_requested) { // carefull about edge conditions
-      qthread_pack_workerid(workerid,newId++);
-    }
-  }
-#endif
 }
 
 // extern int omp_get_num_threads (void);

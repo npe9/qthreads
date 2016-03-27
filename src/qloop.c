@@ -27,9 +27,6 @@
 # include "qt_threadqueues.h" // for qthread_steal_disable
 #endif
 
-#ifdef QTHREAD_RCRTOOL
-int64_t maestro_size(void);
-#endif
 
 typedef enum {
     ALIGNED,
@@ -174,11 +171,7 @@ static aligned_t qloop_step_wrapper(struct qloop_step_wrapper_args *const restri
     MONITOR_ASM_LABEL(qthread_step_fence3); // add label for HPCToolkit unwind
 # endif
 
-# ifdef QTHREAD_RCRTOOL
-    size_t tot_workers = maestro_size() - 1;  // need zero base count
-# else
     size_t tot_workers = qthread_num_workers() - 1; // I'm already here
-# endif
 
     if (arg->maxPar < tot_workers) {
         tot_workers = arg->maxPar - 1;                           // if less work than workers adjust accordingly
@@ -444,11 +437,7 @@ static void qt_loop_step_inner(const size_t         start,
     qthread_steal_disable();
     aligned_t rootNum = qthread_barrier_id(); // what thread is the root of the tree?
 
-# ifdef QTHREAD_RCRTOOL
-    int s = maestro_size();   // count here is one based
-# else
     int s = qthread_num_workers();
-# endif
     int totThreads;
     if (steps + 1 < s) {   // correct when less work than workers
         totThreads = steps + 1;
