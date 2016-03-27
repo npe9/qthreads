@@ -1,0 +1,21 @@
+Separate ifdefs into feature ifdefs, portability ifdefs and other.
+
+See if I can take the portability ifdefs out.
+
+The features are a little funkier. See which features generalize? Eurekas may be relatively simple. You just test for null and see how that works.
+
+We also need to see what the performance differences of this approach are.
+
+Need to move the yielding logic out.
+     that is an easy win.
+     should allow me to get rid of the ifdef logic in qthread.c as well.
+
+What to do about GUARD_PAGES?
+
+Kill the folds as well.
+
+STACK_GROWS_DOWN behavior should be handled per architecture.
+
+Things like valgrind should be conditional compilation.
+
+
