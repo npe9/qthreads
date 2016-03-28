@@ -76,11 +76,7 @@ static QINLINE void qthread_unique_collect(const qt_key_t key,
 # define QTHREAD_FEB_UNIQUERECORD2(TYPE, ADDR, SHEP) do { } while(0)
 #endif // ifdef QTHREAD_FEB_PROFILING
 
-#ifdef QTHREAD_COUNT_THREADS
-# define QTHREAD_COUNT_THREADS_BINCOUNTER(TYPE, BIN) qthread_internal_incr(&TYPE ## _stripes[(BIN)], &TYPE ## _stripes_locks[(BIN)], 1)
-#else
 # define QTHREAD_COUNT_THREADS_BINCOUNTER(TYPE, BIN) do { } while(0)
-#endif
 
 #endif // ifndef QT_PROFILING_H
 /* vim:set expandtab: */

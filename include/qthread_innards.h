@@ -104,10 +104,6 @@ typedef struct qlib_s {
     (QTHREAD_ASSEMBLY_ARCH == QTHREAD_POWERPC32) || \
     (QTHREAD_ASSEMBLY_ARCH == QTHREAD_SPARCV9_32)
     QTHREAD_FASTLOCK_TYPE *atomic_locks;
-# ifdef QTHREAD_COUNT_THREADS
-    aligned_t             *atomic_stripes;
-    QTHREAD_FASTLOCK_TYPE *atomic_stripes_locks;
-# endif
 #endif
 
     /*AGG cost method, call method  and max cost
