@@ -56,10 +56,6 @@ struct _qt_threadqueue {
     /* the following is for estimating a queue's "busy" level, and is not
      * guaranteed accurate (that would be a race condition) */
     saligned_t advisory_queuelen;
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    uint32_t   frustration;
-    QTHREAD_COND_DECL(trigger);
-#endif
 } /* qt_threadqueue_t */;
 
 /* Memory Management */
@@ -101,10 +97,6 @@ qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
     q->q.shadow_head               = q->q.head = q->q.tail = NULL;
     q->advisory_queuelen           = 0;
     q->q.nemesis_advisory_queuelen = 0; // redundant
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    q->frustration = 0;
-    QTHREAD_COND_INIT(q->trigger);
-#endif /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
 
     return q;
 }                                      /*}}} */
@@ -197,9 +189,6 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
             break;
         }
     }
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    QTHREAD_COND_DESTROY(q->trigger);
-#endif
     FREE_THREADQUEUE(q);
 }                                      /*}}} */
 
@@ -320,20 +309,6 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
     }
     PARANOIA(sanity_check_tq(&q->q));
     (void)qthread_incr(&(q->advisory_queuelen), 1);
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    /* awake waiter */
-    /* Yes, this needs to be here, to prevent reading frustration being hoisted
-     * to before the enqueue operations. */
-    MACHINE_FENCE;
-    if (q->frustration) {
-        QTHREAD_COND_LOCK(q->trigger);
-        if (q->frustration) {
-            q->frustration = 0;
-            QTHREAD_COND_SIGNAL(q->trigger);
-        }
-        QTHREAD_COND_UNLOCK(q->trigger);
-    }
-#endif /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
 }                                      /*}}} */
 
 void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
@@ -367,17 +342,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
         qt_eureka_check(0);
 #endif /* QTHREAD_USE_EUREKAS */
         while (q->q.shadow_head == NULL && q->q.head == NULL) {
-#ifndef QTHREAD_CONDWAIT_BLOCKING_QUEUE
             SPINLOCK_BODY();
-#else
-            if (qthread_incr(&q->frustration, 1) > 1000) {
-                QTHREAD_COND_LOCK(q->trigger);
-                if (q->frustration > 1000) {
-                    QTHREAD_COND_WAIT(q->trigger);
-                }
-                QTHREAD_COND_UNLOCK(q->trigger);
-            }
-#endif      /* ifdef USE_HARD_POLLING */
         }
 #ifdef QTHREAD_USE_EUREKAS
         qt_eureka_disable();

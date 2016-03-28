@@ -34,10 +34,6 @@ struct _qt_threadqueue_node {
 struct _qt_threadqueue {
     qt_threadqueue_node_t *head;
     qt_threadqueue_node_t *tail;
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    aligned_t              fruitless;
-    QTHREAD_COND_DECL(trigger);
-#endif                          /* CONDWAIT */
     /* the following is for estimating a queue's "busy" level, and is not
      * guaranteed accurate (that would be a race condition) */
     saligned_t advisory_queuelen;
@@ -114,16 +110,9 @@ qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
     qt_threadqueue_t *q = ALLOC_THREADQUEUE();
 
     if (q != NULL) {
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-        q->fruitless = 0;
-        QTHREAD_COND_INIT(q->trigger);
-#endif   /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
         ALLOC_TQNODE(((qt_threadqueue_node_t **)&(q->head)));
         assert(q->head != NULL);
         if (q->head == NULL) {   // if we're not using asserts, fail nicely
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-            QTHREAD_COND_DESTROY(q->trigger);
-#endif
             FREE_THREADQUEUE(q);
             q = NULL;
         }
@@ -186,9 +175,6 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
         qt_threadqueue_dequeue(q);
     }
     assert(q->head == q->tail);
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    QTHREAD_COND_DESTROY(q->trigger);
-#endif
     FREE_TQNODE((qt_threadqueue_node_t *)q->head);
     FREE_THREADQUEUE(q);
 }                                      /*}}} */
@@ -267,16 +253,6 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
     qthread_debug(THREADQUEUE_DETAILS, "q(%p), t(%p:%i): appended head:%p nextptr:%p tail:%p\n", q, t, t->thread_id, q->head, q->head ? q->head->next : NULL, q->tail);
 
     (void)qthread_incr(&q->advisory_queuelen, 1);
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    if (q->fruitless) {
-        QTHREAD_COND_LOCK(q->trigger);
-        if (q->fruitless) {
-            q->fruitless = 0;
-            QTHREAD_BCAST(q->trigger);
-        }
-        QTHREAD_COND_UNLOCK(q->trigger);
-    }
-#endif
     hazardous_ptr(0, NULL); // release the ptr (avoid hazardptr resource exhaustion)
 }                           /*}}} */
 
@@ -316,38 +292,10 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
         hazardous_ptr(1, next_ptr);
 
         if (next_ptr == NULL) { // queue is empty
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-            if (qthread_internal_incr(&q->fruitless, &q->fruitless_m, 1) > 1000) {
-# ifdef QTHREAD_USE_EUREKAS
-                qt_eureka_check(0);
-# endif /* QTHREAD_USE_EUREKAS */
-                QTHREAD_COND_LOCK(q->trigger);
-                while (q->fruitless > 1000) {
-                    QTHREAD_COND_WAIT(q->trigger);
-                }
-                QTHREAD_COND_UNLOCK(q->trigger);
-# ifdef QTHREAD_USE_EUREKAS
-                qt_eureka_disable();
-# endif /* QTHREAD_USE_EUREKAS */
-            } else {
-# ifdef QTHREAD_USE_EUREKAS
-                qt_eureka_check(0);
-# endif /* QTHREAD_USE_EUREKAS */
-# ifdef HAVE_PTHREAD_YIELD
-                pthread_yield();
-# elif HAVE_SHED_YIELD
-                sched_yield();
-# endif
-# ifdef QTHREAD_USE_EUREKAS
-                qt_eureka_disable();
-# endif /* QTHREAD_USE_EUREKAS */
-            }
-#else       /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
 # ifdef QTHREAD_USE_EUREKAS
             qt_eureka_check(1);
 # endif /* QTHREAD_USE_EUREKAS */
             SPINLOCK_BODY();
-#endif              /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
             continue;
         }
         qthread_debug(THREADQUEUE_DETAILS, "q(%p): next_ptr = %p\n", q, next_ptr);
