@@ -340,10 +340,8 @@ int API_FUNC qthread_debuglevel(int Q_UNUSED d)
 
 #include "qt_profiling.h"
 
-#ifndef QTHREAD_NO_ASSERTS
 int   qthread_library_initialized = 0;
 void *shep0arg                    = NULL;
-#endif
 
 static QINLINE void alloc_rdata(qthread_shepherd_t *me,
                                 qthread_t          *t)
@@ -439,7 +437,6 @@ static void *qthread_master(void *arg)
     assert(me != NULL);
     assert(me->shepherd_id <= qlib->nshepherds);
     qthread_debug(SHEPHERD_FUNCTIONS, "id(%u): forked with arg %p\n", my_id, arg);
-#ifndef QTHREAD_NO_ASSERTS
     if ((shep0arg != NULL) && (my_id == 0)) {
         if (arg != shep0arg) {
             print_error("arg = %p, shep0arg = %p\n", arg, shep0arg);
@@ -447,7 +444,6 @@ static void *qthread_master(void *arg)
         assert(arg == shep0arg);
         shep0arg = NULL;
     }
-#endif
 
     /*******************************************************************************/
     /* Initialize myself                                                           */
@@ -1019,10 +1015,8 @@ int API_FUNC qthread_initialize(void)
     }
     qaffinity = qt_internal_get_env_bool("AFFINITY", 1);
     qthread_debug(AFFINITY_DETAILS, "qaffinity = %i\n", qaffinity);
-#ifndef QTHREAD_NO_ASSERTS
     qthread_library_initialized = 1;
     MACHINE_FENCE;
-#endif
     {
         int ret = qt_affinity_gendists(qlib->shepherds, nshepherds);
         if (ret != QTHREAD_SUCCESS) {
@@ -1153,9 +1147,7 @@ int API_FUNC qthread_initialize(void)
 #endif
                         &(qlib->shepherds[0].workers[0]),
                         &(qlib->mccoy_thread->rdata->context));
-#ifndef QTHREAD_NO_ASSERTS
     shep0arg = &(qlib->shepherds[0].workers[0]);
-#endif
 /* this launches shepherd 0 */
     qthread_debug(CORE_DETAILS | SHEPHERD_DETAILS, "launching shepherd 0\n");
 #ifdef QTHREAD_USE_VALGRIND
@@ -1794,11 +1786,9 @@ void API_FUNC qthread_finalize(void)
     qthread_debug(CORE_DETAILS, "destroy shepherd thread-local data\n");
     TLS_DELETE(shepherd_structs);
 
-#ifndef QTHREAD_NO_ASSERTS
     MACHINE_FENCE;
     qthread_library_initialized = 0;
     MACHINE_FENCE;
-#endif
     qthread_debug(CORE_DETAILS, "finished.\n");
     fflush(stdout);
 }                      /*}}} */

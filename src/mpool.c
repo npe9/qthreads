@@ -233,7 +233,6 @@ static qt_mpool_threadlocal_cache_t *qt_mpool_internal_getcache(qt_mpool pool)
         uintptr_t count_caches = (uintptr_t)TLS_GET(pool_cache_count);
         qthread_debug(MPOOL_DETAILS, "-> count_caches = %i, pool->offset = %i\n", (int)count_caches, (int)pool->offset);
         if (count_caches < pool->offset) {
-# if !defined(QTHREAD_NO_ASSERTS) || defined(QTHREAD_DEBUG)
             qthread_worker_id_t wkr = qthread_readstate(CURRENT_UNIQUE_WORKER);
             /* I don't fully understand why this is necessary. I *suspect* that
              * on thread 0, the initialization routine isn't happening
@@ -243,7 +242,6 @@ static qt_mpool_threadlocal_cache_t *qt_mpool_internal_getcache(qt_mpool pool)
                 qthread_debug(MPOOL_DETAILS, "%u -> resetting tc to NULL (was %p)\n", wkr, tc);
                 tc = NULL;
             }
-# endif
             ASSERT_ONLY(if (wkr != NO_WORKER) {
                             assert(pool_cache_array[wkr] == tc);
                         }
@@ -268,7 +266,6 @@ static qt_mpool_threadlocal_cache_t *qt_mpool_internal_getcache(qt_mpool pool)
             TLS_SET(pool_cache_count, count_caches);
         } else if (tc == NULL) {
             qthread_debug(MPOOL_DETAILS, "tc was NULL despite count_caches being big enough!?! (%p)\n", tc);
-# if !defined(QTHREAD_NO_ASSERTS)
             qthread_worker_id_t wkr = qthread_readstate(CURRENT_UNIQUE_WORKER);
             /* I don't fully understand why this is necessary. I *suspect* that
              * on thread 0, the initialization routine isn't happening
@@ -282,7 +279,6 @@ static qt_mpool_threadlocal_cache_t *qt_mpool_internal_getcache(qt_mpool pool)
                 qthread_debug(MPOOL_DETAILS, "pool_cache_array[%u] -> %p\n", wkr, pool_cache_array[wkr]);
                 assert(pool_cache_array[wkr] == tc);
             }
-# endif
         }
     }
     assert(tc);
