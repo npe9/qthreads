@@ -5,9 +5,6 @@
 #include <qthread/common.h>
 // #define DEBUG_CPUID 1
 
-#ifdef DEBUG_CPUID
-# include <stdio.h>
-#endif
 
 enum vendor {AMD, Intel, Unknown};
 static int cacheline_bytes = 0;
@@ -79,9 +76,6 @@ static void descriptor(unsigned int d)
         case 0x0a: case 0x0c: case 0x41: case 0x42: case 0x43:
         case 0x44: case 0x45: case 0x82: case 0x83: case 0x84:
         case 0x85:
-# ifdef DEBUG_CPUID
-            printf("\top 2: code %02x: 32\n", d);
-# endif
             cacheline_bytes = MAX(cacheline_bytes, 32);
             return;
 
@@ -95,9 +89,6 @@ static void descriptor(unsigned int d)
         case 0xd0: case 0xd1: case 0xd2: case 0xd6: case 0xd7:
         case 0xd8: case 0xdc: case 0xdd: case 0xde: case 0xe2:
         case 0xe3: case 0xe4: case 0xea: case 0xeb: case 0xec:
-# ifdef DEBUG_CPUID
-            printf("\top 2: code %02x: 64\n", d);
-# endif
             cacheline_bytes = MAX(cacheline_bytes, 64);
             return;
 
@@ -140,9 +131,6 @@ static void figure_out_cacheline_size(void)
     (QTHREAD_ASSEMBLY_ARCH == QTHREAD_SPARCV9_64)
     cacheline_bytes = 128;
 #elif (QTHREAD_ASSEMBLY_ARCH == QTHREAD_IA64)
-# ifdef DEBUG_CPUID
-    printf("IA64 does not support CPUID; but is usually 128\n");
-# endif
     cacheline_bytes = 128;             // Itanium L2/L3 are 128, L1 is 64
 #elif (QTHREAD_ASSEMBLY_ARCH == QTHREAD_TILEPRO)
     cacheline_bytes = 64;
@@ -163,33 +151,17 @@ static void figure_out_cacheline_size(void)
     if ((ebx == 0x756e6547) && (edx == 0x49656e69) && (ecx == 0x6c65746e)) {
         largest_std = eax;
         v           = Intel;
-#  ifdef DEBUG_CPUID
-        printf("GenuineIntel (%u max)\n", largest_std);
-#  endif
     } else if ((ebx == 0x68747541) && (ecx == 0x444d4163) && (edx == 0x69746e65)) {
         largest_std = eax;
         v           = AMD;
-#  ifdef DEBUG_CPUID
-        printf("AuthenticAMD (%u max)\n", largest_std);
-#  endif
     } else {
         v           = Unknown;
         largest_std = eax;
-#  ifdef DEBUG_CPUID
-        printf("Unknown Vendor: %x %x %x %x\n", eax, ebx, ecx, edx);
-        printf("\tvendor string: %c%c%c%c%c%c%c%c%c%c%c%c\n",
-               ebx & 0xff, (ebx >> 8) & 0xff, (ebx >> 16) & 0xff, (ebx >> 24) & 0xff,
-               edx & 0xff, (edx >> 8) & 0xff, (edx >> 16) & 0xff, (edx >> 24) & 0xff,
-               ecx & 0xff, (ecx >> 8) & 0xff, (ecx >> 16) & 0xff, (ecx >> 24) & 0xff);
-#  endif
     }
 
     if ((v == AMD) && (largest_std >= 1)) {
         cpuid(1, &eax, &ebx, &ecx, &edx);
         tmp = 8 * ((ebx >> 8) & 0xff); // The clflush width
-#  ifdef DEBUG_CPUID
-        printf("clflush width: %i\n", tmp);
-#  endif
         cacheline_bytes = MAX(cacheline_bytes, tmp);
     }
     if (v == Intel) {
@@ -215,16 +187,6 @@ static void figure_out_cacheline_size(void)
             cpuid4(cache, &eax, &ebx, &ecx, &edx);
             while ((eax & 0x1f) != 0) {
                 tmp = (ebx & 0xfff) + 1;
-#  ifdef DEBUG_CPUID
-                printf("L%i %s System Coherency Line Size: %i\n",
-                       (eax >> 5) & 0x7,
-                       ((eax & 0x1f) == 1) ? "DCache" : (((eax & 0x1f) == 2) ? "ICache" : (((eax & 0x1f) == 3) ? "UCache" : "NULL")),
-                       tmp);
-                if (ebx == 0) {
-                    printf("\teax:%x ebx:%x ecx:%x edx:%x\n", eax, ebx, ecx, edx);
-                    printf("\tI suspect this is a VirtualBox bug.\n");
-                }
-#  endif
                 cacheline_bytes = MAX(cacheline_bytes, tmp);
                 cpuid4(++cache, &eax, &ebx, &ecx, &edx);
             }
@@ -234,30 +196,18 @@ static void figure_out_cacheline_size(void)
         }
     }
     cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
-#  ifdef DEBUG_CPUID
-    printf("largest ext = %x\n", eax);
-#  endif
     largest_ext = eax;
     if ((v == AMD) && (largest_ext >= 0x80000005)) {
         cpuid(0x80000005, &eax, &ebx, &ecx, &edx);
         tmp = (ecx >> 8) & 0xff;
-#  ifdef DEBUG_CPUID
-        printf("L1 cache line size: %i\n", tmp);
-#  endif
         cacheline_bytes = MAX(cacheline_bytes, tmp);
     }
     if (((v == AMD) || (v == Intel)) && (largest_ext >= 0x80000006)) {
         cpuid(0x80000006, &eax, &ebx, &ecx, &edx);
         tmp = ecx & 0xff;
-#  ifdef DEBUG_CPUID
-        printf("L2 cache line size: %i\n", tmp);
-#  endif
         cacheline_bytes = MAX(cacheline_bytes, tmp);
         if (v == AMD) {
             tmp = edx & 0xff;
-#  ifdef DEBUG_CPUID
-            printf("L3 cache line size: %i\n", tmp);
-#  endif
             cacheline_bytes = MAX(cacheline_bytes, tmp);
         }
     }
@@ -279,15 +229,4 @@ int qthread_cacheline(void)
     return cacheline_bytes;
 }                                      /*}}} */
 
-#ifdef DEBUG_CPUID
-int main()
-{
-    int cl = qthread_cacheline();
-
-    printf("Hello! Cacheline: %i bytes\n", cl);
-
-    return 0;
-}
-
-#endif
 /* vim:set expandtab: */
