@@ -2235,9 +2235,6 @@ static void qthread_wrapper(void *ptr)
 #endif /* ifdef QTHREAD_COUNT_THREADS */
 
     if ((NULL != t->team) && (t->flags & QTHREAD_TEAM_LEADER)) {
-#ifdef TEAM_PROFILE
-        qthread_incr(&qlib->team_leader_start, 1);
-#endif
         if (NULL != t->team->parent_eureka) {
             // This is a subteam's team-leader
             qt_internal_subteam_leader(t);
