@@ -453,9 +453,6 @@ static void *qthread_master(void *arg)
     /* Initialize myself                                                           */
     /*******************************************************************************/
     TLS_SET(shepherd_structs, arg);
-#ifdef QTHREAD_USE_SPAWNCACHE
-    localqueue = qt_init_local_spawncache();
-#endif
 #ifdef QTHREAD_USE_EUREKAS
     qt_eureka_worker_init();
 #endif /* QTHREAD_USE_EUREKAS */
@@ -670,9 +667,6 @@ qt_run:
                         qthread_debug(THREAD_DETAILS | SHEPHERD_DETAILS,
                                       "id(%u): thread %i yielded near; rescheduling\n",
                                       my_id, t->thread_id);
-#ifdef QTHREAD_USE_SPAWNCACHE
-                        if (!qt_spawncache_yield(t))
-#endif
                         {
 #ifdef QTHREAD_LOCAL_PRIORITY
                             qthread_t *f = qt_scheduler_get_thread(threadqueue, localpriorityqueue, NULL, 
@@ -938,9 +932,6 @@ int API_FUNC qthread_initialize(void)
 
     /* initialize the kernel threads and scheduler */
     TLS_INIT(shepherd_structs);
-#ifdef QTHREAD_USE_SPAWNCACHE
-    qt_spawncache_init();
-#endif
     qlib->nshepherds        = nshepherds;
     qlib->nworkerspershep   = nworkerspershep;
     qlib->nshepherds_active = nshepherds;
@@ -2423,41 +2414,7 @@ void API_FUNC qthread_yield_(int k)
                 t->thread_state = QTHREAD_STATE_YIELDED_NEAR;
                 break;
             case 2: // direct-yield
-#ifdef QTHREAD_USE_SPAWNCACHE
-                {
-                    qt_threadqueue_private_t *pq = qt_spawncache_get();
-                    if (pq->on_deck) {
-                        qthread_t *nt = qt_threadqueue_private_dequeue(pq);
-                        assert(nt);
-                        if (((nt->flags & QTHREAD_SIMPLE) != 0) || (nt->thread_state != QTHREAD_STATE_NEW)) {
-                            qt_spawncache_spawn(nt, t->rdata->shepherd_ptr->ready);
-                            goto basic_yield;
-                        }
-                        /* Initialize nt's rdata */
-                        alloc_rdata(t->rdata->shepherd_ptr, nt);
-                        nt->thread_state = QTHREAD_STATE_YIELDED; // special indicator state for qthread_wrapper()
-                        nt->rdata->blockedon.thread = t;
-                        qthread_makecontext(&nt->rdata->context, nt->rdata->stack, qlib->qthread_stack_size, (void(*)(void))qthread_wrapper, nt, t->rdata->return_context);
-                        nt->rdata->return_context = t->rdata->return_context;
-                        RLIMIT_TO_TASK(t);
-                        /* SWAP! */
-                        qthread_debug(SHEPHERD_DETAILS,
-                                "t(%p): executing swapcontext(%p, %p)...\n", t, &t->rdata->context, &nt->rdata->context);
-#ifdef HAVE_NATIVE_MAKECONTEXT
-                        qassert(swapcontext(&t->rdata->context, &nt->rdata->context), 0);
-#else
-                        qassert(qt_swapctxt(&t->rdata->context, &nt->rdata->context), 0);
-#endif
-                        qthread_debug(THREAD_BEHAVIOR, "tid %u resumed.\n", t->thread_id);
-                        RLIMIT_TO_NORMAL(t);
-                        return;
-                    }
-                }
-#endif
             case 0: // general yield
-#ifdef QTHREAD_USE_SPAWNCACHE
-basic_yield:
-#endif
                 t->thread_state = QTHREAD_STATE_YIELDED;
                 break;
         }
@@ -2469,9 +2426,6 @@ basic_yield:
 
 void API_FUNC qthread_flushsc(void)
 {   /*{{{*/
-#ifdef QTHREAD_USE_SPAWNCACHE
-    qt_spawncache_flush(qlib->threadqueues[qthread_readstate(CURRENT_UNIQUE_WORKER)]);
-#endif
 } /*}}}*/
 
 /***********************************************
@@ -2709,13 +2663,6 @@ int API_FUNC qthread_spawn(qthread_f             f,
             + ((double)concurrentthreads / threadcount);
         QTHREAD_FASTLOCK_UNLOCK(&concurrentthreads_lock);
 #endif  /* ifdef QTHREAD_COUNT_THREADS */
-#ifdef QTHREAD_USE_SPAWNCACHE
-        if (target_shep == NO_SHEPHERD) {
-            if (!qt_spawncache_spawn(t, qlib->threadqueues[dest_shep])) {
-                qt_threadqueue_enqueue(qlib->threadqueues[dest_shep], t);
-            }
-        } else
-#endif
         {
 #ifdef QTHREAD_LOCAL_PRIORITY
             if (feature_flag & QTHREAD_SPAWN_LOCAL_PRIORITY)

@@ -143,10 +143,6 @@ AC_ARG_ENABLE([memory-scribbling],
                                Allocated memory gets written with 0x55 and
                                freed memory gets written with 0x77])])
 
-AC_ARG_ENABLE([spawn-cache],
-              [AS_HELP_STRING([--disable-spawn-cache],
-                              [prevents qthreads from using a worker-specific cache of spawns])])
-
 AC_ARG_ENABLE([eurekas],
               [AS_HELP_STRING([--enable-eurekas],
                               [supports handling of eureka events])])
@@ -649,10 +645,6 @@ AS_IF([test "x$enable_pooled_memory" = "xno"],
 
 AS_IF([test "x$enable_memory_scribbling" = "xyes"],
       [AC_DEFINE([QTHREAD_MEMORY_SCRIBBLING], [1], [turns on memory scribbling])])
-
-AS_IF([test "x$enable_spawn_cache" != "xno"],
-      [AC_DEFINE([QTHREAD_USE_SPAWNCACHE],[1],[Define to use worker-specific spawn cache])
-       enable_spawn_cache=yes])
 
 AS_IF([test "x$enable_eurekas" = "xyes"],
       [AC_DEFINE([QTHREAD_USE_EUREKAS],[1],[Define to use eurekas])
@@ -1158,7 +1150,6 @@ AM_CONDITIONAL([COMPILE_ROSE_EXTENSIONS], [test "x$enable_rose_extensions" = "xy
 AM_CONDITIONAL([COMPILE_RCRTOOL], [test "x$enable_rcrtool" = "xyes"])
 AM_CONDITIONAL([COMPILE_CHAPEL_INTERFACE], [test "x$compile_chapel_interface" = "xyes"])
 AM_CONDITIONAL([COMPILE_COMPAT_ATOMIC], [test "x$compile_compat_atomic" = "xyes"])
-AM_CONDITIONAL([COMPILE_SPAWNCACHE], [test "x$enable_spawn_cache" = "xyes"])
 AM_CONDITIONAL([COMPILE_EUREKAS], [test "x$enable_eurekas" = "xyes"])
 AM_CONDITIONAL([HAVE_PROG_TIMELIMIT], [test "x$timelimit_path" != "x"])
 AM_CONDITIONAL([COMPILE_MULTINODE], [test "$enable_multinode" = "yes"])
@@ -1237,10 +1228,6 @@ echo    ""
 AS_IF([test "x$enable_pooled_memory" = "xyes"],
       [pool_string="memory"],
       [pool_string=""])
-AS_IF([test "x$enable_spawn_cache" = "xyes"],
-      [AS_IF([test "x$pool_string" != "x"],
-             [pool_string="$pool_string, spawns"],
-             [pool_string="spawns"])])
 AS_IF([test "x$enable_hardware_atomics" = "xno"],
       [AS_IF([test "x$ac_cv_func_pthread_spin_init" = "xyes"],
              [incr_string="Spin (software)"],
