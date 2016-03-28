@@ -74,8 +74,6 @@ int main(int   argc,
     TEST_OPTION(CURRENT_SHEPHERD, ==, 0); // maybe this will change someday
     TEST_OPTION(CURRENT_WORKER, ==, 0); // maybe this will change someday
     TEST_OPTION(CURRENT_UNIQUE_WORKER, ==, 0); // maybe this will change someday
-    TEST_OPTION(CURRENT_TEAM, ==, QTHREAD_DEFAULT_TEAM_ID);
-    TEST_OPTION(PARENT_TEAM, ==, QTHREAD_NON_TEAM_ID);
 
     return EXIT_SUCCESS;
 }

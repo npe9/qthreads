@@ -32,8 +32,7 @@ libqthread_la_SOURCES = \
 	sincs/@with_sinc@.c \
 	affinity/common.c \
 	affinity/@qthread_topo@.c \
-	touch.c \
-	teams.c
+	touch.c
 
 EXTRA_DIST = 
 
@@ -45,10 +44,6 @@ endif
 
 if COMPILE_SPAWNCACHE
 libqthread_la_SOURCES += spawncache.c
-endif
-
-if COMPILE_EUREKAS
-libqthread_la_SOURCES += eurekas.c
 endif
 
 if COMPILE_COMPAT_ATOMIC

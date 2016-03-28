@@ -49,7 +49,6 @@ noinst_HEADERS = \
 	qt_spawn_macros.h \
 	qt_spawncache.h \
 	qt_subsystems.h \
-	qt_teams.h \
 	qt_threadqueues.h \
 	qt_threadqueue_scheduler.h \
 	qt_threadstate.h \
@@ -60,10 +59,6 @@ noinst_HEADERS = \
 	rose_sinc_barrier.h \
 	rose_xomp.h \
 	spr_innards.h
-
-if COMPILE_EUREKAS
-noinst_HEADERS += qt_eurekas.h
-endif
 
 if COMPILE_MULTINODE
 noinst_HEADERS += qt_multinode_innards.h

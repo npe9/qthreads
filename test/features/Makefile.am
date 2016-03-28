@@ -8,10 +8,8 @@
 TESTS = \
 		qt_loop \
 		qt_loop_simple \
-		qt_loop_sinc \
 		qt_loop_balance \
 		qt_loop_balance_simple \
-		qt_loop_balance_sinc \
 		qt_loop_queue \
 		qutil \
 		qutil_qsort \
@@ -26,10 +24,6 @@ TESTS = \
 		allpairs \
 		subteams \
 		qt_dictionary
-
-if COMPILE_EUREKAS
-TESTS += eureka
-endif
 
 EXTRA_PROGRAMS = wavefront
 
@@ -68,11 +62,7 @@ qt_loop_SOURCES = qt_loop.c
 
 qt_loop_simple_SOURCES = qt_loop_simple.c
 
-qt_loop_sinc_SOURCES = qt_loop_sinc.c
-
 qt_loop_balance_SOURCES = qt_loop_balance.c
-
-qt_loop_balance_sinc_SOURCES = qt_loop_balance_sinc.c
 
 qutil_SOURCES = qutil.c
 
@@ -105,5 +95,3 @@ cxx_qt_loop_SOURCES = cxx_qt_loop.cpp
 cxx_qt_loop_balance_SOURCES = cxx_qt_loop_balance.cpp
 
 wavefront_SOURCES = wavefront.c
-
-eureka_SOURCES = eureka.c

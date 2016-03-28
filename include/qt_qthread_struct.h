@@ -11,7 +11,6 @@
 #include "qt_shepherd_innards.h"
 #include "qt_threadstate.h"
 #include "qt_blocking_structs.h"
-#include "qt_teams.h"
 #include "qt_queue.h"
 
 #define ARGCOPY_DEFAULT   1024
@@ -26,8 +25,6 @@
 #define QTHREAD_UNSTEALABLE      (1 << 4)
 #define QTHREAD_SIMPLE           (1 << 5)
 #define QTHREAD_HAS_ARGCOPY      (1 << 6)
-#define QTHREAD_TEAM_LEADER      (1 << 7)
-#define QTHREAD_TEAM_WATCHER     (1 << 8)
 #define QTHREAD_BIG_STRUCT       (1 << 9)
 #define QTHREAD_AGGREGABLE       (1 << 10)
 #define QTHREAD_AGGREGATED       (1 << 11)
@@ -75,7 +72,6 @@ struct qthread_s {
     void                          *ret;             /* user defined retval location */
     struct qthread_runtime_data_s *rdata;
 
-    qt_team_t                     *team; /* reference to task team */
     /* preconditions for data-dependent tasks */
     void                          *preconds;
 

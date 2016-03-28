@@ -31,9 +31,7 @@ TESTS = \
 		tasklocal_data_no_argcopy \
 		external_fork \
 		external_syncvar \
-		read \
-		test_teams \
-		test_subteams
+		read
 
 check_PROGRAMS = $(TESTS)
 

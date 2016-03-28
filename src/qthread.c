@@ -80,10 +80,6 @@
 # include "qt_multinode_innards.h"
 #endif
 #include "qt_aligned_alloc.h"
-#include "qt_teams.h"
-#ifdef QTHREAD_USE_EUREKAS
-# include "qt_eurekas.h"
-#endif /* QTHREAD_USE_EUREKAS */
 #include "qt_subsystems.h"
 #include "qt_output_macros.h"
 #include "qt_int_log.h"
@@ -156,9 +152,7 @@ static QINLINE void qthread_makecontext(qt_context_t *const c,
 static QINLINE qthread_t *qthread_thread_new(qthread_f   f,
                                              const void *arg,
                                              size_t      arg_size,
-                                             void       *ret,
-                                             qt_team_t  *team,
-                                             int         team_leader);
+                                             void       *ret);
 
 /*Make method externally available for the scheduler; to be used when agg tasks*/
 void qthread_thread_free(qthread_t *t);
@@ -456,9 +450,6 @@ static void *qthread_master(void *arg)
 #ifdef QTHREAD_USE_SPAWNCACHE
     localqueue = qt_init_local_spawncache();
 #endif
-#ifdef QTHREAD_USE_EUREKAS
-    qt_eureka_worker_init();
-#endif /* QTHREAD_USE_EUREKAS */
 
     current = &(me_worker->current);
 
@@ -643,9 +634,6 @@ qt_run:
 
                 t = *current; // necessary for direct-swap sanity
                 *current = NULL; // neessary for "queue sanity"
-#ifdef QTHREAD_USE_EUREKAS
-                *current = NULL; // necessary for eureka sanity
-#endif /* QTHREAD_USE_EUREKAS */
 
                 qthread_debug(THREAD_DETAILS, "id(%u): back from qthread_exec, state is %i\n", my_id, t->thread_state);
                 /* now clean up, based on the thread's state */
@@ -744,22 +732,6 @@ qt_run:
                                       my_id, t->thread_id);
                         qt_blocking_subsystem_enqueue(t->rdata->blockedon.io);
                         break;
-#ifdef QTHREAD_USE_EUREKAS
-                    case QTHREAD_STATE_ASSASSINATED:
-                        qthread_debug(THREAD_DETAILS | SHEPHERD_DETAILS,
-                                      "id(%u): thread %i assassinated\n",
-                                      my_id, t->thread_id);
-                        qthread_internal_assassinate(t);
-                        /* now, we're done cleaning, so we can unblock the assassination signal */
-                        {
-                            sigset_t iset;
-                            qassert(sigemptyset(&iset), 0);
-                            qassert(sigaddset(&iset, QT_ASSASSINATE_SIGNAL), 0);
-                            qassert(sigaddset(&iset, QT_EUREKA_SIGNAL), 0);
-                            qassert(sigprocmask(SIG_UNBLOCK, &iset, NULL), 0);
-                        }
-                        break;
-#endif /* QTHREAD_USE_EUREKAS */
                     case QTHREAD_STATE_TERMINATED:
                         qthread_debug(THREAD_DETAILS | SHEPHERD_DETAILS,
                                       "id(%u): thread %i terminated\n",
@@ -1056,7 +1028,6 @@ int API_FUNC qthread_initialize(void)
     generic_rdata_pool = qt_mpool_create(sizeof(struct qthread_runtime_data_s));
 #endif /* ifndef UNPOOLED */
     initialize_hazardptrs();
-    qt_internal_teams_init();
     qthread_queue_subsystem_init();
     qt_feb_subsystem_init(need_sync);
     qt_syncvar_subsystem_init(need_sync);
@@ -1105,7 +1076,7 @@ int API_FUNC qthread_initialize(void)
  * this weirdness is so that the current thread can block the same way that
  * a qthread can. */
     qthread_debug(SHEPHERD_DETAILS, "allocating shep0\n");
-    qlib->mccoy_thread = qthread_thread_new(NULL, NULL, 0, NULL, NULL, 0);
+    qlib->mccoy_thread = qthread_thread_new(NULL, NULL, 0, NULL);
     qthread_debug(CORE_DETAILS, "mccoy thread = %p\n", qlib->mccoy_thread);
     qassert_ret(qlib->mccoy_thread, QTHREAD_MALLOC_ERROR);
 
@@ -1467,8 +1438,6 @@ void API_FUNC qthread_finalize(void)
     }
 #endif
 
-    qt_internal_teams_reclaim();
-
     qthread_shepherd_t *shep0 = &(qlib->shepherds[0]);
 
 #ifdef QTHREAD_RCRTOOL_STAT
@@ -1515,7 +1484,7 @@ void API_FUNC qthread_finalize(void)
             }
 #endif
             qthread_debug(SHEPHERD_DETAILS, "terminating worker %i:%i\n", (int)i, (int)j);
-            t = qthread_thread_new(NULL, NULL, 0, NULL, NULL, 0);
+            t = qthread_thread_new(NULL, NULL, 0, NULL);
             assert(t != NULL);         /* what else can we do? */
             t->thread_state = QTHREAD_STATE_TERM_SHEP;
             t->thread_id    = QTHREAD_NON_TASK_ID;
@@ -1975,32 +1944,6 @@ size_t API_FUNC qthread_readstate(const enum introspective_state type)
                 return worker ? (worker->unique_id - 1) : NO_WORKER;
             }
 
-        case CURRENT_TEAM:
-            if (NULL != qlib) {
-                qthread_t *self = qthread_internal_self();
-
-                if ((NULL != self) && (NULL != self->team)) {
-                    return self->team->team_id;
-                } else {
-                    return 1;
-                }
-            } else {
-                return 1;
-            }
-
-        case PARENT_TEAM:
-            if (NULL != qlib) {
-                qthread_t *self = qthread_internal_self();
-
-                if ((NULL != self) && (NULL != self->team)) {
-                    return self->team->parent_id;
-                } else {
-                    return 0;
-                }
-            } else {
-                return 0;
-            }
-
         default:
             return (size_t)(-1);
     }
@@ -2023,9 +1966,7 @@ aligned_t API_FUNC *qthread_retloc(void)
 static QINLINE qthread_t *qthread_thread_new(const qthread_f f,
                                              const void     *arg,
                                              size_t          arg_size,
-                                             void           *ret,
-                                             qt_team_t      *team,
-                                             int             team_leader)
+                                             void           *ret)
 {                      /*{{{ */
     qthread_t *t;
 
@@ -2040,7 +1981,6 @@ static QINLINE qthread_t *qthread_thread_new(const qthread_f f,
     t->arg   = (void *)arg;
     t->ret   = ret;
     t->rdata = NULL;
-    t->team  = team;
 
 #ifdef QTHREAD_USE_ROSE_EXTENSIONS
     t->id                    = 0;
@@ -2085,11 +2025,6 @@ static QINLINE qthread_t *qthread_thread_new(const qthread_f f,
         memcpy(t->arg, arg, arg_size);
     } else {
         t->flags = 0;
-    }
-
-    // am I the team leader?
-    if (team_leader) {
-        t->flags |= QTHREAD_TEAM_LEADER;
     }
 
     t->thread_state = QTHREAD_STATE_NEW;
@@ -2157,15 +2092,7 @@ extern void *qthread_fence2;
 
 void API_FUNC qthread_call_method(qthread_f f, void*arg, void* ret, uint16_t flags){
     if (ret) {
-        if (flags & QTHREAD_RET_IS_SINC) {
-            if (flags & QTHREAD_RET_IS_VOID_SINC) {
-                (f)(arg);
-                qt_sinc_submit((qt_sinc_t *)ret, NULL);
-            } else {
-                aligned_t retval = (f)(arg);
-                qt_sinc_submit((qt_sinc_t *)ret, &retval);
-            }
-        } else if (flags & QTHREAD_RET_IS_SYNCVAR) {
+        if (flags & QTHREAD_RET_IS_SYNCVAR) {
             /* this should avoid problems with irresponsible return values */
             uint64_t retval = INT64TOINT60((f)(arg));
             qassert(qthread_syncvar_writeEF_const((syncvar_t *)ret, retval), QTHREAD_SUCCESS);
@@ -2212,9 +2139,6 @@ static void qthread_wrapper(void *ptr)
         qt_threadqueue_enqueue_yielded(t->rdata->shepherd_ptr->ready, prev_t);
     }
 
-#ifdef QTHREAD_USE_EUREKAS
-    qt_eureka_check(0);
-#endif /* QTHREAD_USE_EUREKAS */
     qthread_debug(THREAD_BEHAVIOR,
                   "tid %u executing f=%p arg=%p...\n",
                   t->thread_id, t->f, t->arg);
@@ -2234,15 +2158,6 @@ static void qthread_wrapper(void *ptr)
     QTHREAD_FASTLOCK_UNLOCK(&effconcurrentthreads_lock);
 #endif /* ifdef QTHREAD_COUNT_THREADS */
 
-    if ((NULL != t->team) && (t->flags & QTHREAD_TEAM_LEADER)) {
-#ifdef TEAM_PROFILE
-        qthread_incr(&qlib->team_leader_start, 1);
-#endif
-        if (NULL != t->team->parent_eureka) {
-            // This is a subteam's team-leader
-            qt_internal_subteam_leader(t);
-        }
-    }
 
     assert(t->rdata);
     if(t->flags & QTHREAD_AGGREGATED){
@@ -2250,37 +2165,21 @@ static void qthread_wrapper(void *ptr)
         qthread_f *list_of_f = (qthread_f*) ( & (((int*)t->preconds)[1]) );
         qthread_agg_f agg_f = (qthread_agg_f) ( t->f ) ;
         agg_f(count, list_of_f, (void**)t->arg, (void**)t->ret, t->flags);
-        if (NULL != t->team) { qt_internal_teamfinish(t->team, t->flags); }
-        //TODO: How to handle ret sinc flags? 
-        //Temp solution: use qthread_call_method and pass task flags to the agg function.
     }
     else if (t->ret) {
         qthread_debug(THREAD_DETAILS, "tid %u, with flags %u, handling retval\n", t->thread_id, t->flags);
-        if (t->flags & QTHREAD_RET_IS_SINC) {
-            if (t->flags & QTHREAD_RET_IS_VOID_SINC) {
-                (t->f)(t->arg);
-                if (NULL != t->team) { qt_internal_teamfinish(t->team, t->flags); }
-                qt_sinc_submit((qt_sinc_t *)t->ret, NULL);
-            } else {
-                aligned_t retval = (t->f)(t->arg);
-                if (NULL != t->team) { qt_internal_teamfinish(t->team, t->flags); }
-                qt_sinc_submit((qt_sinc_t *)t->ret, &retval);
-            }
-        } else if (t->flags & QTHREAD_RET_IS_SYNCVAR) {
+        if (t->flags & QTHREAD_RET_IS_SYNCVAR) {
             /* this should avoid problems with irresponsible return values */
             uint64_t retval = INT64TOINT60((t->f)(t->arg));
-            if (NULL != t->team) { qt_internal_teamfinish(t->team, t->flags); }
             qassert(qthread_syncvar_writeEF_const((syncvar_t *)t->ret, retval), QTHREAD_SUCCESS);
         } else {
             aligned_t retval = (t->f)(t->arg);
-            if (NULL != t->team) { qt_internal_teamfinish(t->team, t->flags); }
             qthread_debug(FEB_DETAILS, "tid %u filling retval (%p)\n", t->thread_id, t->ret);
             qassert(qthread_writeEF_const((aligned_t *)t->ret, retval), QTHREAD_SUCCESS);
         }
     } else {
         assert(t->f);
         (t->f)(t->arg);
-        if (NULL != t->team) { qt_internal_teamfinish(t->team, t->flags); }
     }
 
     t->thread_state = QTHREAD_STATE_TERMINATED;
@@ -2581,40 +2480,7 @@ int API_FUNC qthread_spawn(qthread_f             f,
            (feature_flag & QTHREAD_SPAWN_NEW_SUBTEAM) ||
            (feature_flag & QTHREAD_SPAWN_MASK_TEAMS));
 
-    qt_team_t *curr_team   = (me && me->team) ? me->team : NULL;
-    qt_team_t *new_team    = NULL;
-    int        team_leader = -1;
-
-    if (!(feature_flag & QTHREAD_SPAWN_MASK_TEAMS)) {
-        // Spawn into the current team
-        team_leader = 0;
-
-        if (curr_team) {
-            new_team = curr_team;
-            qt_sinc_expect(new_team->sinc, 1);
-        }
-    } else if (feature_flag & QTHREAD_SPAWN_NEW_TEAM) {
-        // Spawn into a new team
-        qthread_internal_incr(&(qlib->team_count), &qlib->team_count_lock, 1);
-        team_leader = 1;
-
-        // Allocate new team structure
-        new_team = qt_internal_team_new(ret, feature_flag, NULL, QTHREAD_NON_TEAM_ID);
-        assert(new_team);
-    } else if (feature_flag & QTHREAD_SPAWN_NEW_SUBTEAM) {
-        // Task will participate in a new subteam
-        qthread_internal_incr(&(qlib->team_count), &qlib->team_count_lock, 1);
-        team_leader = 1;
-
-        // Allocate new team structure
-        new_team = qt_internal_team_new(ret, feature_flag, curr_team, curr_team ? curr_team->team_id : QTHREAD_DEFAULT_TEAM_ID);
-        assert(new_team);
-    } else {
-        // Unsupported spawn option
-        assert(0);
-    }
-
-    t = qthread_thread_new(f, arg, arg_size, (aligned_t *)ret, new_team, team_leader);
+    t = qthread_thread_new(f, arg, arg_size, (aligned_t *)ret);
     qassert_ret(t, QTHREAD_MALLOC_ERROR);
 
     if (QTHREAD_UNLIKELY(target_shep != NO_SHEPHERD)) {
