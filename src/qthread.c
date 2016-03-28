@@ -27,9 +27,6 @@
 #ifdef HAVE_SCHED_H
 # include <sched.h>
 #endif
-#ifdef QTHREAD_USE_VALGRIND
-# include <valgrind/memcheck.h>
-#endif
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <errno.h>
@@ -367,11 +364,6 @@ static QINLINE void alloc_rdata(qthread_shepherd_t *me,
     rdata->stack          = stack;
     rdata->shepherd_ptr   = me;
     rdata->blockedon.io   = NULL;
-#ifdef QTHREAD_USE_VALGRIND
-    if (stack) {
-        rdata->valgrind_stack_id = VALGRIND_STACK_REGISTER(stack, qlib->qthread_stack_size);
-    }
-#endif
 #if defined(QTHREAD_USE_ROSE_EXTENSIONS) && defined(QTHREAD_OMP_AFFINITY)
     rdata->child_affinity = OMP_NO_CHILD_TASK_AFFINITY;
 #endif
@@ -1114,10 +1106,6 @@ int API_FUNC qthread_initialize(void)
     qlib->master_stack = qthread_internal_aligned_alloc(qlib->master_stack_size, QTHREAD_STACK_ALIGNMENT);
     qassert_ret(qlib->master_stack, QTHREAD_MALLOC_ERROR);
     qthread_debug(CORE_DETAILS, "master_stack = %p\n", qlib->master_stack);
-#ifdef QTHREAD_USE_VALGRIND
-    qlib->valgrind_masterstack_id =
-        VALGRIND_STACK_REGISTER(qlib->master_stack, qlib->master_stack_size);
-#endif
 
 /* the context will have its own stack ptr */
     qlib->mccoy_thread->thread_state = QTHREAD_STATE_YIELDED;                    /* avoid re-launching */
@@ -1158,12 +1146,6 @@ int API_FUNC qthread_initialize(void)
 #endif
 /* this launches shepherd 0 */
     qthread_debug(CORE_DETAILS | SHEPHERD_DETAILS, "launching shepherd 0\n");
-#ifdef QTHREAD_USE_VALGRIND
-    VALGRIND_CHECK_MEM_IS_ADDRESSABLE(&qlib->mccoy_thread->rdata->context, sizeof(qt_context_t));
-    VALGRIND_CHECK_MEM_IS_ADDRESSABLE(&(qlib->master_context), sizeof(qt_context_t));
-    VALGRIND_MAKE_MEM_DEFINED(&qlib->mccoy_thread->rdata->context, sizeof(qt_context_t));
-    VALGRIND_MAKE_MEM_DEFINED(&(qlib->master_context), sizeof(qt_context_t));
-#endif
     qthread_debug(CORE_DETAILS, "calling swapcontext into master_context\n");
 #ifdef HAVE_NATIVE_MAKECONTEXT
     qassert(swapcontext(&qlib->mccoy_thread->rdata->context, &(qlib->master_context)), 0);
@@ -1737,10 +1719,6 @@ void API_FUNC qthread_finalize(void)
     QTHREAD_FASTLOCK_DESTROY(qlib->max_unique_id_lock);
     QTHREAD_FASTLOCK_DESTROY(qlib->sched_shepherd_lock);
 
-#ifdef QTHREAD_USE_VALGRIND
-    VALGRIND_STACK_DEREGISTER(qlib->mccoy_thread->rdata->valgrind_stack_id);
-    VALGRIND_STACK_DEREGISTER(qlib->valgrind_masterstack_id);
-#endif
     assert(qlib->mccoy_thread->rdata->stack == NULL);
     if (qlib->mccoy_thread->rdata->tasklocal_size > 0) {
         FREE(*(void **)&qlib->mccoy_thread->data[0], qlib->mccoy_thread->rdata->tasklocal_size);
@@ -2115,9 +2093,6 @@ void qthread_thread_free(qthread_t *t)
                 *(void **)&t->data[0] = NULL;
             }
         }
-#ifdef QTHREAD_USE_VALGRIND
-        VALGRIND_STACK_DEREGISTER(t->rdata->valgrind_stack_id);
-#endif
         if (t->flags & QTHREAD_SIMPLE) {
             qthread_debug(THREAD_DETAILS, "t(%p): releasing rdata %p\n", t, t->rdata);
             FREE_RDATA(t->rdata);
@@ -2379,12 +2354,6 @@ void INTERNAL qthread_exec(qthread_t    *t,
         qthread_debug(SHEPHERD_DETAILS,
                       "t(%p): executing swapcontext(%p, %p)...\n", t, t->rdata->return_context, &t->rdata->context);
         /* return_context (aka "c") is being written over with the current context */
-#ifdef QTHREAD_USE_VALGRIND
-        VALGRIND_CHECK_MEM_IS_ADDRESSABLE(&t->rdata->context, sizeof(qt_context_t));
-        VALGRIND_CHECK_MEM_IS_ADDRESSABLE(t->rdata->return_context, sizeof(qt_context_t));
-        VALGRIND_MAKE_MEM_DEFINED(&t->rdata->context, sizeof(qt_context_t));
-        VALGRIND_MAKE_MEM_DEFINED(t->rdata->return_context, sizeof(qt_context_t));
-#endif
 #ifdef HAVE_NATIVE_MAKECONTEXT
         qassert(swapcontext(t->rdata->return_context, &t->rdata->context), 0);
 #else
@@ -3018,12 +2987,6 @@ void INTERNAL qthread_back_to_master(qthread_t *t)
     assert((t->flags & QTHREAD_SIMPLE) == 0);
     RLIMIT_TO_NORMAL(t);
     /* now back to your regularly scheduled master thread */
-#ifdef QTHREAD_USE_VALGRIND
-    VALGRIND_CHECK_MEM_IS_ADDRESSABLE(&t->rdata->context, sizeof(qt_context_t));
-    VALGRIND_CHECK_MEM_IS_ADDRESSABLE(t->rdata->return_context, sizeof(qt_context_t));
-    VALGRIND_MAKE_MEM_DEFINED(&t->rdata->context, sizeof(qt_context_t));
-    VALGRIND_MAKE_MEM_DEFINED(t->rdata->return_context, sizeof(qt_context_t));
-#endif
 #ifdef HAVE_NATIVE_MAKECONTEXT
     qassert(swapcontext(&t->rdata->context, t->rdata->return_context), 0);
 #else
@@ -3037,12 +3000,6 @@ void INTERNAL qthread_back_to_master2(qthread_t *t)
     assert((t->flags & QTHREAD_SIMPLE) == 0);
     RLIMIT_TO_NORMAL(t);
     /* now back to your regularly scheduled master thread */
-#ifdef QTHREAD_USE_VALGRIND
-    VALGRIND_CHECK_MEM_IS_ADDRESSABLE(&t->rdata->context, sizeof(qt_context_t));
-    VALGRIND_CHECK_MEM_IS_ADDRESSABLE(t->rdata->return_context, sizeof(qt_context_t));
-    VALGRIND_MAKE_MEM_DEFINED(&t->rdata->context, sizeof(qt_context_t));
-    VALGRIND_MAKE_MEM_DEFINED(t->rdata->return_context, sizeof(qt_context_t));
-#endif
 #ifdef HAVE_NATIVE_MAKECONTEXT
     setcontext(t->rdata->return_context);
 #else

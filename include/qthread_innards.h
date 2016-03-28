@@ -61,9 +61,6 @@ typedef struct qlib_s {
 
     void                      *master_stack;
     qt_context_t               master_context;
-#ifdef QTHREAD_USE_VALGRIND
-    unsigned int               valgrind_masterstack_id;
-#endif
 #ifdef CAS_STEAL_PROFILE
     uint64_strip_t *cas_steal_profile;
 #endif

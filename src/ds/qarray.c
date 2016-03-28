@@ -6,12 +6,8 @@
 #include <stdlib.h>                    /* for calloc() */
 #include <sys/types.h>
 #include <sys/mman.h>
-#ifdef QTHREAD_USE_VALGRIND
-# include <valgrind/memcheck.h>
-#else
 # define VALGRIND_MAKE_MEM_NOACCESS(a, b)
 # define VALGRIND_MAKE_MEM_DEFINED(a, b)
-#endif
 
 /* Public Headers */
 #include "qthread/qarray.h"

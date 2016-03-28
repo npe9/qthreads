@@ -10,9 +10,6 @@
 #include <string.h>
 
 /* External Headers */
-#ifdef QTHREAD_USE_VALGRIND
-# include <valgrind/memcheck.h>
-#else
 # define VALGRIND_DESTROY_MEMPOOL(a)
 # define VALGRIND_MAKE_MEM_NOACCESS(a, b)
 # define VALGRIND_MAKE_MEM_DEFINED(a, b)
@@ -20,7 +17,6 @@
 # define VALGRIND_CREATE_MEMPOOL(a, b, c)
 # define VALGRIND_MEMPOOL_ALLOC(a, b, c)
 # define VALGRIND_MEMPOOL_FREE(a, b)
-#endif
 
 /* Internal Includes */
 #include <qthread/qthread-int.h>       /* for uintptr_t */
