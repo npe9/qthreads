@@ -635,9 +635,6 @@ qt_run:
 
                 *current = t;
 
-#ifdef HAVE_NATIVE_MAKECONTEXT
-                getcontext(&my_context);
-#endif
                 qthread_debug(THREAD_DETAILS, "id(%u): about to exec thread. shepherd context is %p\n", my_id, &my_context);
                 qthread_exec(t, &my_context);
 
@@ -1165,11 +1162,7 @@ int API_FUNC qthread_initialize(void)
     VALGRIND_MAKE_MEM_DEFINED(&(qlib->master_context), sizeof(qt_context_t));
 #endif
     qthread_debug(CORE_DETAILS, "calling swapcontext into master_context\n");
-#ifdef HAVE_NATIVE_MAKECONTEXT
-    qassert(swapcontext(&qlib->mccoy_thread->rdata->context, &(qlib->master_context)), 0);
-#else
     qassert(qt_swapctxt(&qlib->mccoy_thread->rdata->context, &(qlib->master_context)), 0);
-#endif
     qthread_debug(CORE_DETAILS, "back from master_context\n");
 
 # ifdef QTHREAD_RCRTOOL
@@ -1303,29 +1296,7 @@ static QINLINE void qthread_makecontext(qt_context_t *const c,
 #ifdef UCSTACK_HAS_SSFLAGS
     c->uc_stack.ss_flags = 0;
 #endif
-#ifdef HAVE_NATIVE_MAKECONTEXT
-    /* the makecontext man page (Linux) says: set the uc_link FIRST.
-     * why? no idea */
-    c->uc_link = returnc;          /* NULL pthread_exit() */
-#endif
-#ifdef HAVE_NATIVE_MAKECONTEXT
-# ifdef QTHREAD_MAKECONTEXT_SPLIT
-#  ifdef EXTRA_MAKECONTEXT_ARGC
-    makecontext(c, func, 3, high, low);
-#  else
-    makecontext(c, func, 2, high, low);
-#  endif /* EXTRA_MAKECONTEXT_ARGC */
-# else /* QTHREAD_MAKECONTEXT_SPLIT */
-#  ifdef EXTRA_MAKECONTEXT_ARGC
-    makecontext(c, func, 2, arg);
-#  else
-    makecontext(c, func, 1, arg);
-#  endif /* EXTRA_MAKECONTEXT_ARGC */
-# endif  /* QTHREAD_MAKECONTEXT_SPLIT */
-    assert((void *)c->uc_link == (void *)returnc);
-#else /* ifdef HAVE_NATIVE_MAKECONTEXT */
     qt_makectxt(c, func, 1, arg);
-#endif /* ifdef HAVE_NATIVE_MAKECONTEXT */
 }                      /*}}} */
 
 /* this adds a function to the list of cleanup functions to call at finalize;
@@ -2366,10 +2337,6 @@ void INTERNAL qthread_exec(qthread_t    *t,
             qthread_makecontext(&t->rdata->context,
                                 t->rdata->stack, qlib->qthread_stack_size,
                                 (void (*)(void))qthread_wrapper, t, c);
-#ifdef HAVE_NATIVE_MAKECONTEXT
-        } else {
-            t->rdata->context.uc_link = c; /* NULL pthread_exit() */
-#endif
         }
 
         t->rdata->return_context = c;
@@ -2385,11 +2352,7 @@ void INTERNAL qthread_exec(qthread_t    *t,
         VALGRIND_MAKE_MEM_DEFINED(&t->rdata->context, sizeof(qt_context_t));
         VALGRIND_MAKE_MEM_DEFINED(t->rdata->return_context, sizeof(qt_context_t));
 #endif
-#ifdef HAVE_NATIVE_MAKECONTEXT
-        qassert(swapcontext(t->rdata->return_context, &t->rdata->context), 0);
-#else
         qassert(qt_swapctxt(t->rdata->return_context, &t->rdata->context), 0);
-#endif
         RLIMIT_TO_NORMAL(t);
     } else {
         assert(t->thread_state == QTHREAD_STATE_NEW);
@@ -2443,11 +2406,7 @@ void API_FUNC qthread_yield_(int k)
                         /* SWAP! */
                         qthread_debug(SHEPHERD_DETAILS,
                                 "t(%p): executing swapcontext(%p, %p)...\n", t, &t->rdata->context, &nt->rdata->context);
-#ifdef HAVE_NATIVE_MAKECONTEXT
-                        qassert(swapcontext(&t->rdata->context, &nt->rdata->context), 0);
-#else
                         qassert(qt_swapctxt(&t->rdata->context, &nt->rdata->context), 0);
-#endif
                         qthread_debug(THREAD_BEHAVIOR, "tid %u resumed.\n", t->thread_id);
                         RLIMIT_TO_NORMAL(t);
                         return;
@@ -3024,11 +2983,7 @@ void INTERNAL qthread_back_to_master(qthread_t *t)
     VALGRIND_MAKE_MEM_DEFINED(&t->rdata->context, sizeof(qt_context_t));
     VALGRIND_MAKE_MEM_DEFINED(t->rdata->return_context, sizeof(qt_context_t));
 #endif
-#ifdef HAVE_NATIVE_MAKECONTEXT
-    qassert(swapcontext(&t->rdata->context, t->rdata->return_context), 0);
-#else
     qassert(qt_swapctxt(&t->rdata->context, t->rdata->return_context), 0);
-#endif
     RLIMIT_TO_TASK(t);
 }                      /*}}} */
 
@@ -3043,11 +2998,7 @@ void INTERNAL qthread_back_to_master2(qthread_t *t)
     VALGRIND_MAKE_MEM_DEFINED(&t->rdata->context, sizeof(qt_context_t));
     VALGRIND_MAKE_MEM_DEFINED(t->rdata->return_context, sizeof(qt_context_t));
 #endif
-#ifdef HAVE_NATIVE_MAKECONTEXT
-    setcontext(t->rdata->return_context);
-#else
     qt_setmctxt(&t->rdata->return_context->mc);
-#endif
 }                      /*}}} */
 
 /* function to move a qthread from one shepherd to another */
