@@ -36,21 +36,6 @@
  * and sending a signal to itself)
  */
 
-#ifdef QTHREAD_NO_ASSERTS
-# define ASSERT_ONLY(x)
-# define qassert(op, val)    op
-# define qassertnot(op, val) op
-# ifdef assert
-#  undef assert
-# endif
-# define assert(foo)
-# define qassert_ret(assertion, retval) do { if (!(assertion)) { return retval; } } while (0)
-# define qassert_retvoid(assertion)     do { if (!(assertion)) { return; } } while (0)
-# define qassert_goto(assertion, tag)   do { if (!(assertion)) { goto tag; } } while (0)
-# define qassert_aligned(variable, alignment)
-# define qgoto(tag) tag :
-# define tassert(foo)
-#else // ifdef QTHREAD_NO_ASSERTS
 # define ASSERT_ONLY(x)                       x
 # define qassert(op, val)                     assert((op) == (val))
 # define qassertnot(op, val)                  assert(op != val)
@@ -63,7 +48,6 @@
 } while (0)
 # define qgoto(tag)
 # define tassert(foo) do { if (!(foo)) { QTHREAD_TRAP(); } } while (0)
-#endif // ifdef QTHREAD_NO_ASSERTS
 
 #ifdef QTHREAD_PARANOIA
 # define PARANOIA(x) x
