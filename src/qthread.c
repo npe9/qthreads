@@ -1293,22 +1293,6 @@ void API_FUNC qthread_finalize(void)
         }
     }
 
-<<<<<<< HEAD
-#ifdef QTHREAD_SHEPHERD_PROFILING
-    print_status("Shepherd 0 spent %f%% of the time idle, handling %lu threads\n",
-                 shep0->idle_time / qtimer_secs(shep0->total_time) * 100.0,
-                 (unsigned long)shep0->num_threads);
-    print_status("Shepherd 0 averaged %g secs to find a new thread, max %g secs\n",
-                 shep0->idle_time / shep0->idle_count,
-                 shep0->idle_maxtime);
-    qtimer_destroy(shep0->total_time);
-=======
-#ifdef QTHREAD_USE_ROSE_EXTENSIONS
-    qthread_debug(BARRIER_DETAILS, "destroying the global barrier\n");
-    qt_global_barrier_destroy();
->>>>>>> feat-no-shepard-profiling
-#endif
-
     qthread_debug(CORE_DETAILS, "calling early cleanup functions\n");
     while (qt_cleanup_early_funcs != NULL) {
         struct qt_cleanup_funcs_s *tmp = qt_cleanup_early_funcs;
