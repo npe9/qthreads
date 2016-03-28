@@ -56,9 +56,6 @@ struct qthread_runtime_data_s {
     int                 criticalsect; /* critical section depth */
     qt_barrier_t       *barrier;      /* add to allow barriers to be stacked/nested parallelism - akp 10/16/12 */
 
-#ifdef QTHREAD_USE_VALGRIND
-    unsigned int valgrind_stack_id;
-#endif
 # ifdef QTHREAD_OMP_AFFINITY
     /* affinity for children created by this task */
     qthread_shepherd_id_t child_affinity;
