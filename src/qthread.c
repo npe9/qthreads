@@ -258,14 +258,9 @@ static QINLINE void FREE_STACK(void *t)
 # endif /* ifdef QTHREAD_GUARD_PAGES */
 #endif  /* if defined(UNPOOLED_STACKS) || defined(UNPOOLED) */
 
-#if defined(UNPOOLED)
-# define ALLOC_RDATA() (struct qthread_runtime_data_s *)MALLOC(sizeof(struct qthread_runtime_data_s));
-# define FREE_RDATA(r) FREE(r, sizeof(struct qthread_runtime_data_s))
-#else
 static qt_mpool generic_rdata_pool = NULL;
 # define ALLOC_RDATA() (struct qthread_runtime_data_s *)qt_mpool_alloc(generic_rdata_pool)
 # define FREE_RDATA(r) qt_mpool_free(generic_rdata_pool, (r))
-#endif /* if defined(UNPOOLED) */
 
 #ifdef NEED_RLIMIT
 # define RLIMIT_TO_NORMAL(thr) do {                                              \
@@ -868,7 +863,6 @@ int API_FUNC qthread_initialize(void)
                                                            sizeof(void *));
     qthread_debug(CORE_DETAILS, "qthread task-local size: %u\n", qlib->qthread_tasklocal_size);
 
-#ifndef UNPOOLED
     generic_qthread_pool     = qt_mpool_create_aligned(sizeof(qthread_t) + sizeof(void *) + qlib->qthread_tasklocal_size, qthread_cacheline());
     generic_big_qthread_pool = qt_mpool_create(sizeof(qthread_t) + qlib->qthread_argcopy_size + qlib->qthread_tasklocal_size);
     if (GUARD_PAGES) {
@@ -879,7 +873,6 @@ int API_FUNC qthread_initialize(void)
         generic_stack_pool = qt_mpool_create_aligned(qlib->qthread_stack_size + sizeof(struct qthread_runtime_data_s), QTHREAD_STACK_ALIGNMENT);     // stacks on most platforms must be 16-byte aligned (or less)
     }
     generic_rdata_pool = qt_mpool_create(sizeof(struct qthread_runtime_data_s));
-#endif /* ifndef UNPOOLED */
     initialize_hazardptrs();
     qt_internal_teams_init();
     qthread_queue_subsystem_init();
@@ -1474,7 +1467,6 @@ void API_FUNC qthread_finalize(void)
         }
     }
 
-#ifndef UNPOOLED
     qthread_debug(CORE_DETAILS, "destroy global memory pools\n");
     qt_mpool_destroy(generic_qthread_pool);
     generic_qthread_pool = NULL;
@@ -1484,7 +1476,6 @@ void API_FUNC qthread_finalize(void)
     generic_stack_pool = NULL;
     qt_mpool_destroy(generic_rdata_pool);
     generic_rdata_pool = NULL;
-#endif /* ifndef UNPOOLED */
     qthread_debug(CORE_DETAILS, "destroy global shepherd array\n");
     FREE(qlib->shepherds, qlib->nshepherds * sizeof(qthread_shepherd_t));
     FREE(qlib->threadqueues, qlib->nshepherds * sizeof(qt_threadqueue_t *));
