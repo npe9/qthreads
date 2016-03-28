@@ -140,12 +140,7 @@ int GUARD_PAGES = 1;
 #endif
 
 /* Internal Prototypes */
-#ifdef QTHREAD_MAKECONTEXT_SPLIT
-static void qthread_wrapper(unsigned int high,
-                            unsigned int low);
-#else
 static void qthread_wrapper(void *ptr);
-#endif
 
 static QINLINE void qthread_makecontext(qt_context_t *const c,
                                         void *const         stack,
@@ -391,20 +386,6 @@ static int    idleCheckin   = 0;   // added for RCRTOOL level >= 3 stats
  *
  * this function is the workhorse of the library: this is the function that
  * gets spawned several times and runs all the qthreads. */
-#ifdef QTHREAD_MAKECONTEXT_SPLIT
-static void *qthread_master(void *arg);
-static void *qthread_master_wrapper(unsigned int high,
-                                    unsigned int low)
-{                      /*{{{ */
-    qthread_shepherd_t *me =
-        (qthread_shepherd_t *)((((uintptr_t)high) << 32) | low);
-
-    qthread_debug(SHEPHERD_DETAILS, "high(%x), low(%x): me = %p\n",
-                  high, low, me);
-    return qthread_master(me);
-}
-
-#endif /* ifdef QTHREAD_MAKECONTEXT_SPLIT */
 #include <time.h>
 extern volatile int *allowed_workers;
 
@@ -1146,11 +1127,7 @@ int API_FUNC qthread_initialize(void)
                                                                     &qlib->max_unique_id_lock, 1);
     qthread_makecontext(&(qlib->master_context), qlib->master_stack,
                         qlib->master_stack_size,
-#ifdef QTHREAD_MAKECONTEXT_SPLIT
-                        (void (*)(void))qthread_master_wrapper,
-#else
                         (void (*)(void))qthread_master,
-#endif
                         &(qlib->shepherds[0].workers[0]),
                         &(qlib->mccoy_thread->rdata->context));
 #ifndef QTHREAD_NO_ASSERTS
@@ -1278,10 +1255,6 @@ static QINLINE void qthread_makecontext(qt_context_t *const c,
                                         const void *const   arg,
                                         qt_context_t *const returnc)
 {                      /*{{{ */
-#ifdef QTHREAD_MAKECONTEXT_SPLIT
-    const unsigned int high = ((uintptr_t)arg) >> 32;
-    const unsigned int low  = ((uintptr_t)arg) & 0xffffffff;
-#endif
 
     assert(c != NULL);
     assert(stack != NULL);
@@ -1309,19 +1282,11 @@ static QINLINE void qthread_makecontext(qt_context_t *const c,
     c->uc_link = returnc;          /* NULL pthread_exit() */
 #endif
 #ifdef HAVE_NATIVE_MAKECONTEXT
-# ifdef QTHREAD_MAKECONTEXT_SPLIT
-#  ifdef EXTRA_MAKECONTEXT_ARGC
-    makecontext(c, func, 3, high, low);
-#  else
-    makecontext(c, func, 2, high, low);
-#  endif /* EXTRA_MAKECONTEXT_ARGC */
-# else /* QTHREAD_MAKECONTEXT_SPLIT */
 #  ifdef EXTRA_MAKECONTEXT_ARGC
     makecontext(c, func, 2, arg);
 #  else
     makecontext(c, func, 1, arg);
 #  endif /* EXTRA_MAKECONTEXT_ARGC */
-# endif  /* QTHREAD_MAKECONTEXT_SPLIT */
     assert((void *)c->uc_link == (void *)returnc);
 #else /* ifdef HAVE_NATIVE_MAKECONTEXT */
     qt_makectxt(c, func, 1, arg);
@@ -2179,17 +2144,9 @@ void API_FUNC qthread_call_method(qthread_f f, void*arg, void* ret, uint16_t fla
 }
 
 /* this function runs a thread until it completes or yields */
-#ifdef QTHREAD_MAKECONTEXT_SPLIT
-static void qthread_wrapper(unsigned int high,
-                            unsigned int low)
-{                      /*{{{ */
-    qthread_t *t = (qthread_t *)((((uintptr_t)high) << 32) | low);
-
-#else
 static void qthread_wrapper(void *ptr)
 {
     qthread_t *t = (qthread_t *)ptr;
-#endif
 #ifdef QTHREAD_ALLOW_HPCTOOLKIT_STACK_UNWINDING
     MONITOR_ASM_LABEL(qthread_fence1); // add label for HPCToolkit stack unwind
 #endif
@@ -2394,13 +2351,7 @@ void INTERNAL qthread_exec(qthread_t    *t,
     } else {
         assert(t->thread_state == QTHREAD_STATE_NEW);
         t->thread_state = QTHREAD_STATE_RUNNING;
-#ifdef QTHREAD_MAKECONTEXT_SPLIT
-        unsigned int high = (((uintptr_t)t) >> 32) & 0xffffffff;
-        unsigned int low  = ((uintptr_t)t) & 0xffffffff;
-        qthread_wrapper(high, low);
-#else
         qthread_wrapper(t);
-#endif
     }
 
     assert(t != NULL);
