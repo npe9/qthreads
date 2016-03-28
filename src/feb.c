@@ -35,12 +35,6 @@
  * Local Variables
  *********************************************************************/
 static qt_hash *FEBs;
-#ifdef QTHREAD_COUNT_THREADS
-aligned_t *febs_stripes;
-# ifdef QTHREAD_MUTEX_INCREMENT
-QTHREAD_FASTLOCK_TYPE *febs_stripes_locks;
-# endif
-#endif
 
 /********************************************************************
  * Local Types
@@ -110,20 +104,8 @@ static void qt_feb_subsystem_shutdown(void)
         qt_hash_destroy_deallocate(FEBs[i],
                                    (qt_hash_deallocator_fn)
                                    qthread_addrstat_delete);
-#ifdef QTHREAD_COUNT_THREADS
-        print_status("bin %i used %u times for FEBs\n", i, (unsigned int)febs_stripes[i]);
-# ifdef QTHREAD_MUTEX_INCREMENT
-        QTHREAD_FASTLOCK_DESTROY(febs_stripes_locks[i]);
-# endif
-#endif
     }
     FREE(FEBs, sizeof(qt_hash) * QTHREAD_LOCKING_STRIPES);
-#ifdef QTHREAD_COUNT_THREADS
-    FREE(febs_stripes, sizeof(aligned_t) * QTHREAD_LOCKING_STRIPES);
-# ifdef QTHREAD_MUTEX_INCREMENT
-    FREE(febs_stripes_locks, sizeof(QTHREAD_FASTLOCK_TYPE) * QTHREAD_LOCKING_STRIPES);
-# endif
-#endif
 #if !defined(UNPOOLED_ADDRSTAT) && !defined(UNPOOLED)
     qt_mpool_destroy(generic_addrstat_pool);
     generic_addrstat_pool = NULL;
@@ -146,21 +128,7 @@ void INTERNAL qt_feb_subsystem_init(uint_fast8_t need_sync)
 #endif
     FEBs = MALLOC(sizeof(qt_hash) * QTHREAD_LOCKING_STRIPES);
     assert(FEBs);
-#ifdef QTHREAD_COUNT_THREADS
-    febs_stripes = MALLOC(sizeof(aligned_t) * QTHREAD_LOCKING_STRIPES);
-    assert(febs_stripes);
-# ifdef QTHREAD_MUTEX_INCREMENT
-    febs_stripes_locks = MALLOC(sizeof(QTHREAD_FASTLOCK_TYPE) * QTHREAD_LOCKING_STRIPES);
-    assert(febs_stripes_locks);
-# endif
-#endif /* ifdef QTHREAD_COUNT_THREADS */
     for (unsigned i = 0; i < QTHREAD_LOCKING_STRIPES; i++) {
-#ifdef QTHREAD_COUNT_THREADS
-        febs_stripes[i] = 0;
-# ifdef QTHREAD_MUTEX_INCREMENT
-        QTHREAD_FASTLOCK_INIT(febs_stripes_locks[i]);
-# endif
-#endif
         FEBs[i] = qt_hash_create(need_sync);
         assert(FEBs[i]);
     }
@@ -1303,17 +1271,6 @@ int INTERNAL qthread_readFE_nb(aligned_t *restrict       dest,
     return QTHREAD_SUCCESS;
 }                      /*}}} */
 
-#ifdef QTHREAD_COUNT_THREADS
-extern aligned_t             threadcount;
-extern aligned_t             maxconcurrentthreads;
-extern double                avg_concurrent_threads;
-extern aligned_t             maxeffconcurrentthreads;
-extern double                avg_eff_concurrent_threads;
-extern aligned_t             effconcurrentthreads;
-extern aligned_t             concurrentthreads;
-extern QTHREAD_FASTLOCK_TYPE concurrentthreads_lock;
-extern QTHREAD_FASTLOCK_TYPE effconcurrentthreads_lock;
-#endif
 /*
  * This function walks the list of preconditions. When an empty variable is
  * encountered, it enqueues the "nascent" qthread in the associated FFQ. When
@@ -1400,19 +1357,6 @@ int INTERNAL qthread_check_feb_preconds(qthread_t *t)
     t->thread_state = QTHREAD_STATE_NEW;
     free(t->preconds);
     t->preconds = NULL;
-#ifdef QTHREAD_COUNT_THREADS
-    QTHREAD_FASTLOCK_LOCK(&concurrentthreads_lock);
-    threadcount++;
-    concurrentthreads++;
-    assert(concurrentthreads <= threadcount);
-    if (concurrentthreads > maxconcurrentthreads) {
-        maxconcurrentthreads = concurrentthreads;
-    }
-    avg_concurrent_threads =
-        (avg_concurrent_threads * (double)(threadcount - 1.0) / threadcount)
-        + ((double)concurrentthreads / threadcount);
-    QTHREAD_FASTLOCK_UNLOCK(&concurrentthreads_lock);
-#endif /* ifdef QTHREAD_COUNT_THREADS */
 
     return 0;
 } /*}}}*/
