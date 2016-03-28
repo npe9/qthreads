@@ -11,9 +11,6 @@
 #include "qt_hazardptrs.h"
 #include "qt_macros.h"
 
-#ifdef QTHREAD_SHEPHERD_PROFILING
-# include "qthread/qtimer.h"
-#endif
 
 #ifdef QTHREAD_FEB_PROFILING
 # include "qt_hash.h"
@@ -73,13 +70,6 @@ struct qthread_shepherd_s {
     size_t steal_elected;
     size_t steal_attempted;
     size_t steal_failed;
-#endif
-#ifdef QTHREAD_SHEPHERD_PROFILING
-    qtimer_t total_time;        /* how much time the shepherd spent running */
-    double   idle_maxtime;      /* max time the shepherd spent waiting for new threads */
-    double   idle_time;         /* how much time the shepherd spent waiting for new threads */
-    size_t   idle_count;        /* how many times the shepherd did a blocking dequeue */
-    size_t   num_threads;       /* number of threads handled */
 #endif
 #ifdef QTHREAD_FEB_PROFILING
 # ifdef QTHREAD_MUTEX_INCREMENT

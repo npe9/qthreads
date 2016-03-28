@@ -391,11 +391,6 @@ static void *qthread_master(void *arg)
     qthread_t               **current;
     int                       done = 0;
 
-#ifdef QTHREAD_SHEPHERD_PROFILING
-    me->total_time = qtimer_create();
-    qtimer_t idle = qtimer_create();
-#endif
-
     qthread_debug(SHEPHERD_DETAILS, "alive! me = %p\n", me);
     assert(me != NULL);
     assert(me->shepherd_id <= qlib->nshepherds);
@@ -436,9 +431,6 @@ static void *qthread_master(void *arg)
     assert(threadqueue);
 
     while (!done) {
-#ifdef QTHREAD_SHEPHERD_PROFILING
-        qtimer_start(idle);
-#endif
         qthread_debug(SHEPHERD_DETAILS, "id(%i): fetching a thread from my queue...\n", my_id);
 
         while (!QTHREAD_CASLOCK_READ_UI(me_worker->active)) {
@@ -446,14 +438,6 @@ static void *qthread_master(void *arg)
         }
         t = qt_scheduler_get_thread(threadqueue, localqueue, QTHREAD_CASLOCK_READ_UI(me->active));
         assert(t);
-#ifdef QTHREAD_SHEPHERD_PROFILING
-        qtimer_stop(idle);
-        me->idle_count++;
-        me->idle_time += qtimer_secs(idle);
-        if (me->idle_maxtime < qtimer_secs(idle)) {
-            me->idle_maxtime = qtimer_secs(idle);
-        }
-#endif
 
 
         qthread_debug(THREAD_DETAILS,
@@ -467,11 +451,6 @@ static void *qthread_master(void *arg)
         }
 
         if (t->thread_state == QTHREAD_STATE_TERM_SHEP) {
-#ifdef QTHREAD_SHEPHERD_PROFILING
-            if ((my_id != 0)) {
-                qtimer_stop(me->total_time);
-            }
-#endif
             done = 1;
             qthread_thread_free(t); /* free qthread data structures */
         } else {
@@ -529,11 +508,6 @@ static void *qthread_master(void *arg)
                 assert(t->rdata->shepherd_ptr->ready != NULL);
                 qt_threadqueue_enqueue(t->rdata->shepherd_ptr->ready, t);
             } else {           /* me->active */
-#ifdef QTHREAD_SHEPHERD_PROFILING
-                if (t->thread_state == QTHREAD_STATE_NEW) {
-                    me->num_threads++;
-                }
-#endif
 
                 *current = t;
 
@@ -660,9 +634,6 @@ static void *qthread_master(void *arg)
         }
     }
 
-#ifdef QTHREAD_SHEPHERD_PROFILING
-    qtimer_destroy(idle);
-#endif
     qthread_debug(SHEPHERD_DETAILS, "id(%u): wkr(%u): finished\n",
                   my_id, me_worker->worker_id);
     pthread_exit(NULL);
@@ -1301,9 +1272,6 @@ void API_FUNC qthread_finalize(void)
     }
 
     /* enqueue the termination thread sentinal */
-#ifdef QTHREAD_SHEPHERD_PROFILING
-    qtimer_stop(shep0->total_time);
-#endif
 
     for (i = 0; i < qlib->nshepherds; i++) {
         qthread_worker_id_t j;
@@ -1325,6 +1293,7 @@ void API_FUNC qthread_finalize(void)
         }
     }
 
+<<<<<<< HEAD
 #ifdef QTHREAD_SHEPHERD_PROFILING
     print_status("Shepherd 0 spent %f%% of the time idle, handling %lu threads\n",
                  shep0->idle_time / qtimer_secs(shep0->total_time) * 100.0,
@@ -1333,6 +1302,11 @@ void API_FUNC qthread_finalize(void)
                  shep0->idle_time / shep0->idle_count,
                  shep0->idle_maxtime);
     qtimer_destroy(shep0->total_time);
+=======
+#ifdef QTHREAD_USE_ROSE_EXTENSIONS
+    qthread_debug(BARRIER_DETAILS, "destroying the global barrier\n");
+    qt_global_barrier_destroy();
+>>>>>>> feat-no-shepard-profiling
 #endif
 
     qthread_debug(CORE_DETAILS, "calling early cleanup functions\n");
@@ -1401,17 +1375,6 @@ void API_FUNC qthread_finalize(void)
         }
 #endif
 
-#ifdef QTHREAD_SHEPHERD_PROFILING
-        print_status("Shepherd %i spent %f%% of the time idle, handling %lu threads\n",
-                     i,
-                     shep->idle_time / qtimer_secs(shep->total_time) * 100.0,
-                     (unsigned long)shep->num_threads);
-        qtimer_destroy(shep->total_time);
-        print_status("Shepherd %i averaged %g secs to find a new thread, max %g secs\n",
-                     i,
-                     shep->idle_time / shep->idle_count,
-                     shep->idle_maxtime);
-#endif
 #ifdef QTHREAD_FEB_PROFILING
 # ifdef QTHREAD_MUTEX_INCREMENT
         QTHREAD_ACCUM_MAX(shep0->incr_maxtime, shep->incr_maxtime);
