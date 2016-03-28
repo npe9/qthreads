@@ -39,10 +39,6 @@ struct _qt_threadqueue {
     /* the following is for estimating a queue's "busy" level, and is not
      * guaranteed accurate (that would be a race condition) */
     saligned_t advisory_queuelen;
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    uint32_t   frustration;
-    QTHREAD_COND_DECL(trigger)
-#endif
 } /* qt_threadqueue_t */;
 
 /* Memory Management */
@@ -83,10 +79,6 @@ qt_threadqueue_t INTERNAL *qt_threadqueue_new(void)
 
     q->stack             = NULL;
     q->advisory_queuelen = 0;
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    q->frustration = 0;
-    QTHREAD_COND_INIT(q->trigger);
-#endif /* ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE */
 
     return q;
 } /*}}}*/
@@ -121,9 +113,6 @@ void INTERNAL qt_threadqueue_free(qt_threadqueue_t *q)
 {   /*{{{*/
     assert(q);
     while (qt_threadqueue_dequeue(q)) ;
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    QTHREAD_COND_DESTROY(q->trigger);
-#endif
     FREE_THREADQUEUE(q);
 } /*}}}*/
 
@@ -184,16 +173,6 @@ void INTERNAL qt_threadqueue_enqueue(qt_threadqueue_t *restrict q,
     (void)qthread_incr(&(q->advisory_queuelen), 1);
 
     /* awake waiter */
-#ifdef QTHREAD_CONDWAIT_BLOCKING_QUEUE
-    if (q->frustration) {
-        QTHREAD_COND_LOCK(q->trigger);
-        if (q->frustration) {
-            q->frustration = 0;
-            QTHREAD_COND_SIGNAL(q->trigger);
-        }
-        QTHREAD_COND_UNLOCK(q->trigger);
-    }
-#endif
 } /*}}}*/
 
 void INTERNAL qt_threadqueue_enqueue_yielded(qt_threadqueue_t *restrict q,
@@ -252,18 +231,7 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
         qt_eureka_check(0);
 #endif /* QTHREAD_USE_EUREKAS */
         while (q->stack == NULL) {
-#ifndef QTHREAD_CONDWAIT_BLOCKING_QUEUE
             SPINLOCK_BODY();
-#else
-            COMPILER_FENCE;
-            if (qthread_incr(&q->frustration, 1) > 1000) {
-                QTHREAD_COND_LOCK(q->trigger);
-                if (q->frustration > 1000) {
-                    QTHREAD_COND_WAIT(q->trigger);
-                }
-                QTHREAD_COND_UNLOCK(q->trigger);
-            }
-#endif      /* ifdef USE_HARD_POLLING */
         }
 #ifdef QTHREAD_USE_EUREKAS
         qt_eureka_disable();
