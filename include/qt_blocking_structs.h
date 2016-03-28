@@ -56,10 +56,6 @@ typedef struct qthread_addrstat_s {
     uint_fast8_t          valid;
 } qthread_addrstat_t;
 
-#ifdef UNPOOLED
-# define UNPOOLED_ADDRSTAT
-# define UNPOOLED_ADDRRES
-#endif
 
 #ifdef UNPOOLED_ADDRSTAT
 # define ALLOC_ADDRSTAT() (qthread_addrstat_t *)MALLOC(sizeof(qthread_addrstat_t))
