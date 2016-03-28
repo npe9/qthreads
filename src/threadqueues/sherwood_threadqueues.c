@@ -713,18 +713,12 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
     assert(my_shepherd);
     assert(my_shepherd->ready == q);
     assert(my_shepherd->sorted_sheplist);
-#ifdef QTHREAD_TASK_AGGREGATION
-    t = qt_init_agg_task();
-#endif
 
 #ifdef QTHREAD_USE_EUREKAS
     qt_eureka_disable();
 #endif /* QTHREAD_USE_EUREKAS */
     while (1) {
         qt_threadqueue_node_t *node = NULL;
-#ifdef QTHREAD_TASK_AGGREGATION
-        curr_cost = 0; ret_agg_task = 0;
-#endif
 
 #ifdef QTHREAD_LOCAL_PRIORITY
             /* First check local priority queue */
@@ -759,31 +753,6 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
             qc->on_deck = NULL;
             assert(node->next == NULL);
             assert(node->prev == NULL);
-#ifdef QTHREAD_TASK_AGGREGATION
-            if(QTHREAD_TASK_IS_AGGREGABLE(node->value->flags) && \
-               ((max_t = (qc->qlength + 1 + q->qlength) / qthread_readstate(ACTIVE_WORKERS) / DIV_FACTOR) > 1)
-               ) {
-                max_t = (max_t > MAX_ABS_AGG ? MAX_ABS_AGG : max_t);
-                assert(node->value->thread_state != QTHREAD_STATE_TERM_SHEP);
-                qt_add_first_agg_task(t, &curr_cost, node);
-                node = NULL;
-
-                int *count_addr = &(((int *)t->preconds)[0]);
-                int  lcount     = qt_keep_adding_agg_task(t, max_t, &curr_cost, qc, 0);
-                if((qc->qlength == 0) && ((curr_cost < qlib->max_c) && (*count_addr < max_t))) {
-                    // cache empty and can still add, get more from q
-                    QTHREAD_TRYLOCK_LOCK(&q->qlock);
-                    if(q->head) {
-                        lcount = qt_keep_adding_agg_task(t, max_t, &curr_cost, q, 1);
-                    }
-                    QTHREAD_TRYLOCK_UNLOCK(&q->qlock);
-                } else {   // done, spill remaining cache
-                }
-                ret_agg_task = 1;
-            } else {   // no agg, spill cache
-                       // t = NULL;
-            }
-#endif      /* ifdef QTHREAD_TASK_AGGREGATION */
 
             qthread_debug(THREADQUEUE_DETAILS, "q(%p), qc(%p), active(%u): qc->qlen(%u) Push remaining items onto the real queue\n", q, qc, active, qc->qlength);
 
@@ -862,31 +831,10 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
                 assert(q->qlength > 0);
                 q->qlength--;
                 q->qlength_stealable -= node->stealable;
-#ifdef QTHREAD_TASK_AGGREGATION
-                if(QTHREAD_TASK_IS_AGGREGABLE(node->value->flags) && \
-                   ((max_t = (q->qlength) / qthread_readstate(ACTIVE_WORKERS) / DIV_FACTOR) > 1)
-                   ) { // no point creating an agg task with a single simple task
-                    max_t = (max_t > MAX_ABS_AGG ? MAX_ABS_AGG : max_t);
-                    assert(node->value->thread_state != QTHREAD_STATE_TERM_SHEP);
-                    qt_add_first_agg_task(t, &curr_cost, node);
-                    node = NULL;
-                    if(q->head) {
-                        int lcount = qt_keep_adding_agg_task(t, max_t, &curr_cost, q, 1);
-                    }
-                    ret_agg_task = 1;
-                } else {   // no agg, free agg task (delay)
-                           // t = NULL;
-                }
-#endif          /* ifdef QTHREAD_TASK_AGGREGATION */
             }
             QTHREAD_TRYLOCK_UNLOCK(&q->qlock);
         }
 
-#ifdef QTHREAD_TASK_AGGREGATION
-        if(ret_agg_task) { // use t, node is NULL
-            break;
-        }
-#endif
 
         if ((node == NULL) && my_shepherd->stealing) {
             if (worker_id == NO_WORKER) {
@@ -911,9 +859,6 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
             }
         }
         if (node) {
-#ifdef QTHREAD_TASK_AGGREGATION
-            qthread_thread_free(t); // free agg task; only reallocate it if mccoy found
-#endif
             t = node->value;
             FREE_TQNODE(node);
             if ((t->flags & QTHREAD_REAL_MCCOY)) { // only needs to be on worker 0 for termination
@@ -934,9 +879,6 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
                         my_shepherd->stealing = 2; // no stealing
                         MACHINE_FENCE;
                         qt_threadqueue_enqueue_yielded(q, t);
-#ifdef QTHREAD_TASK_AGGREGATION
-                        t = qt_init_agg_task();
-#endif
                         continue; // keep looking
                 }
             } else {
