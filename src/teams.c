@@ -29,31 +29,9 @@ static qt_mpool generic_team_pool = NULL;
 
 static void qt_internal_teams_shutdown(void);
 static void qt_internal_teams_destroy(void);
-#ifdef TEAM_PROFILE
-static void qt_team_profile(void);
-#endif
 
 void INTERNAL qt_internal_teams_init(void)
 {   /*{{{*/
-#ifdef TEAM_PROFILE
-    qlib->team_create  = 0;
-    qlib->team_destroy = 0;
-
-    qlib->team_subteam_create  = 0;
-    qlib->team_subteam_destroy = 0;
-
-    qlib->team_sinc_create  = 0;
-    qlib->team_sinc_destroy = 0;
-
-    qlib->team_subteams_sinc_create  = 0;
-    qlib->team_subteams_sinc_destroy = 0;
-
-    qlib->team_leader_start = 0;
-    qlib->team_leader_stop  = 0;
-
-    qlib->team_watcher_start = 0;
-    qlib->team_watcher_stop  = 0;
-#endif /* ifdef TEAM_PROFILE */
     qlib->max_team_id = 2;    /* team 1 is reserved for the default team */
     qlib->team_count  = 0;    /* count of existing teams */
     QTHREAD_FASTLOCK_INIT(qlib->max_team_id_lock);
@@ -81,9 +59,6 @@ void INTERNAL qt_internal_teams_reclaim(void)
 
 static void qt_internal_teams_shutdown(void)
 {   /*{{{*/
-#ifdef TEAM_PROFILE
-    qt_team_profile();
-#endif
 } /*}}}*/
 
 static void qt_internal_teams_destroy(void)
@@ -125,69 +100,6 @@ unsigned int API_FUNC qt_team_parent_id(void)
     }
 } /*}}}*/
 
-#ifdef TEAM_PROFILE
-static void qt_team_profile(void)
-{   /*{{{*/
-    fprintf(stderr, "\n======== Teams Profile ========\n\n");
-    fprintf(stderr, "Teams:\n");
-    fprintf(stderr, "%8lu create\n",
-            (unsigned long)qlib->team_create);
-    fprintf(stderr, "%8lu destroy\n",
-            (unsigned long)qlib->team_destroy);
-    fprintf(stderr, "%8lu teams were not destroyed\n",
-            (unsigned long)(qlib->team_create - qlib->team_destroy));
-
-    fprintf(stderr, "\nSubteams:\n");
-    fprintf(stderr, "%8lu subteam create\n",
-            (unsigned long)qlib->team_subteam_create);
-    fprintf(stderr, "%8lu subteam destroy\n",
-            (unsigned long)qlib->team_subteam_destroy);
-    fprintf(stderr, "%8lu subteams were not destroyed\n",
-            (unsigned long)(qlib->team_subteam_create -
-                            qlib->team_subteam_destroy));
-
-    fprintf(stderr, "\nSincs:\n");
-    fprintf(stderr, "%8lu sinc_create\n",
-            (unsigned long)qlib->team_sinc_create);
-    fprintf(stderr, "%8lu sinc_destroy\n",
-            (unsigned long)qlib->team_sinc_destroy);
-    fprintf(stderr, "%8lu sincs were not destroyed\n",
-            (unsigned long)(qlib->team_sinc_create -
-                            qlib->team_sinc_destroy));
-
-    fprintf(stderr, "\nSubteams Sincs:\n");
-    fprintf(stderr, "%8lu subteams_sinc_create\n",
-            (unsigned long)qlib->team_subteams_sinc_create);
-    fprintf(stderr, "%8lu subteams_sinc_destroy\n",
-            (unsigned long)qlib->team_subteams_sinc_destroy);
-    fprintf(stderr, "%8lu subteams sncs were not destroyed\n",
-            (unsigned long)(qlib->team_subteams_sinc_create -
-                            qlib->team_subteams_sinc_destroy));
-
-    fprintf(stderr, "\nLeaders:\n");
-    fprintf(stderr, "%8lu leader_start\n",
-            (unsigned long)qlib->team_leader_start);
-    fprintf(stderr, "%8lu leader_stop\n",
-            (unsigned long)qlib->team_leader_stop);
-    fprintf(stderr, "%8lu leaders did not stop\n",
-            (unsigned long)(qlib->team_leader_start -
-                            qlib->team_leader_stop));
-
-    fprintf(stderr, "\nWatchers:\n");
-    fprintf(stderr, "%8lu watcher_start\n",
-            (unsigned long)qlib->team_watcher_start);
-    fprintf(stderr, "%8lu watcher_stop\n",
-            (unsigned long)qlib->team_watcher_stop);
-    fprintf(stderr, "%8lu watchers did not stop\n",
-            (unsigned long)(qlib->team_watcher_start -
-                            qlib->team_watcher_stop));
-    fprintf(stderr, "\n");
-
-    fprintf(stderr, "Total current team count %8lu\n",
-            (unsigned long)(qlib->team_count));
-} /*}}}*/
-
-#endif /* ifdef TEAM_PROFILE */
 
 // This is called in `qthread_wrapper()` immediately after each team task
 // returns.
@@ -227,9 +139,6 @@ void INTERNAL qt_internal_teamfinish(qt_team_t   *team,
 
             qthread_internal_incr(&(qlib->team_count), &qlib->team_count_lock, -1);
 
-#ifdef TEAM_PROFILE
-            qthread_incr(&qlib->team_destroy, 1);
-#endif
         } else {
             // 1.2. This task is a subteam leader
             assert(team->sinc);
@@ -299,16 +208,8 @@ void INTERNAL qt_internal_teamfinish(qt_team_t   *team,
 
             qthread_internal_incr(&(qlib->team_count), &qlib->team_count_lock, -1);
 
-#ifdef TEAM_PROFILE
-            qthread_incr(&qlib->team_subteam_destroy, 1);
-#endif
         }
 
-#ifdef TEAM_PROFILE
-        qthread_incr(&qlib->team_sinc_destroy, 1);
-        qthread_incr(&qlib->team_subteams_sinc_destroy, 1);
-        qthread_incr(&qlib->team_leader_stop, 1);
-#endif
     } else {
         // 2. This task is not a sub/team leader: a watcher or participant
         assert(team);
@@ -333,9 +234,6 @@ static aligned_t qt_team_watcher(void *args_)
 
     qthread_debug(FEB_DETAILS, "watcher (tid %u) of team %u filling watcher_started (%p)\n", qthread_id(), myteam, &team->watcher_started);
     qthread_fill(&team->watcher_started);
-#ifdef TEAM_PROFILE
-    qthread_incr(&qlib->team_watcher_start, 1);
-#endif
 
     do {
         qthread_debug(FEB_DETAILS, "team %u's watcher (tid %u) waiting for a eureka or a team exit (%p)\n", myteam, qthread_id(), parent_eureka);
@@ -370,9 +268,6 @@ static aligned_t qt_team_watcher(void *args_)
         }
     } while (1);
 
-#ifdef TEAM_PROFILE
-    qthread_incr(&qlib->team_watcher_stop, 1);
-#endif
 
     return 0;
 } /*}}}*/
@@ -422,11 +317,6 @@ qt_team_t INTERNAL *qt_internal_team_new(void *restrict      ret,
         qt_sinc_expect(new_team->parent_subteams_sinc, 1);
     }
 
-#ifdef TEAM_PROFILE
-    qthread_incr(&qlib->team_sinc_create, 1);
-    qthread_incr(&qlib->team_subteams_sinc_create, 1);
-    qthread_incr(&qlib->team_create, 1);
-#endif
     return new_team;
 } /*}}}*/
 
