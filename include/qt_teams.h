@@ -5,11 +5,6 @@
 #include "qt_visibility.h"
 #include "qt_qthread_t.h"
 
-#ifdef QTHREAD_USE_EUREKAS
-#include <signal.h> /* should have SIGUSR1 and SIGUSR2, per P90 */
-#define QT_ASSASSINATE_SIGNAL SIGUSR1
-#define QT_EUREKA_SIGNAL      SIGUSR2
-#endif /* QTHREAD_USE_EUREKAS */
 
 /* flags for teams (must be different bits) */
 #define QTHREAD_TEAM_DEAD             (1 << 0)
