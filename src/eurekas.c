@@ -67,10 +67,6 @@ static void eureka(void)
         /* filter work queue! */
         qt_threadqueue_filter(s->ready, eureka_filter);
     }
-#ifdef QTHREAD_USE_SPAWNCACHE
-    /* 5b: filter the spawncache! */
-    qt_spawncache_filter(eureka_filter);
-#endif
     /* 7: exit barrier */
     {
         int barrier_participation = 1;
@@ -283,10 +279,6 @@ void API_FUNC qt_team_eureka(void)
         /* filter work queue! */
         qt_threadqueue_filter(self->rdata->shepherd_ptr->ready, eureka_filter);
     }
-#ifdef QTHREAD_USE_SPAWNCACHE
-    /* 5b: filter the spawncache! */
-    qt_spawncache_filter(eureka_filter);
-#endif
     /* 6: callback to kill blocked tasks */
     qthread_feb_taskfilter_serial(qt_eureka_internal_filterfunc, NULL);
     qthread_syncvar_taskfilter_serial(qt_eureka_internal_filterfunc, NULL);

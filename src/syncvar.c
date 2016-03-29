@@ -960,9 +960,6 @@ static QINLINE void qthread_syncvar_schedule(qthread_t          *waiter,
     if (waiter->flags & QTHREAD_UNSTEALABLE) {
         qt_threadqueue_enqueue(waiter->rdata->shepherd_ptr->ready, waiter);
     } else {
-#ifdef QTHREAD_USE_SPAWNCACHE
-        if (!qt_spawncache_spawn(waiter, shep->ready))
-#endif
         qt_threadqueue_enqueue(shep->ready, waiter);
     }
 } /*}}}*/

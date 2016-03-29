@@ -118,9 +118,6 @@ static void qthread_queue_internal_launch(qthread_t          *t,
         qthread_debug(FEB_DETAILS, "qthread(%p:%i) enqueueing in target_shep's ready queue (%p:%i)\n", t, (int)t->thread_id, t->rdata->shepherd_ptr, (int)t->rdata->shepherd_ptr->shepherd_id);
         qt_threadqueue_enqueue(t->rdata->shepherd_ptr->ready, t);
     } else
-#ifdef QTHREAD_USE_SPAWNCACHE
-    if (!qt_spawncache_spawn(t, cur_shep->ready))
-#endif
     {
         qthread_debug(FEB_DETAILS, "qthread(%p:%i) enqueueing in cur_shep's ready queue (%p:%i)\n", t, (int)t->thread_id, cur_shep, (int)cur_shep->shepherd_id);
         qt_threadqueue_enqueue(cur_shep->ready, t);

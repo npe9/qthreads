@@ -176,9 +176,6 @@ static inline void qt_feb_schedule(qthread_t          *waiter,
         qthread_debug(FEB_DETAILS, "waiter(%p:%i), shep(%p:%i): enqueueing waiter in target_shep's ready queue (%p:%i)\n", waiter, (int)waiter->thread_id, shep, (int)shep->shepherd_id, waiter->rdata->shepherd_ptr, waiter->rdata->shepherd_ptr->shepherd_id);
         qt_threadqueue_enqueue(waiter->rdata->shepherd_ptr->ready, waiter);
     } else
-#ifdef QTHREAD_USE_SPAWNCACHE
-    if (!qt_spawncache_spawn(waiter, shep->ready))
-#endif
     {
         qthread_debug(FEB_DETAILS, "waiter(%p:%i), shep(%p:%i): enqueueing waiter in shep's ready queue\n", waiter, (int)waiter->thread_id, shep, (int)shep->shepherd_id);
         qt_threadqueue_enqueue(shep->ready, waiter);
