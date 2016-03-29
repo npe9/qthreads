@@ -22,9 +22,6 @@
 #include "qt_threadqueues.h"
 #include "qt_envariables.h"
 #include "qt_debug.h"
-#ifdef QTHREAD_USE_EUREKAS
-#include "qt_eurekas.h" /* for qt_eureka_check() */
-#endif /* QTHREAD_USE_EUREKAS */
 #include "qt_expect.h"
 #include "qt_subsystems.h"
 
@@ -706,9 +703,6 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
     assert(my_shepherd->ready == q);
     assert(my_shepherd->sorted_sheplist);
 
-#ifdef QTHREAD_USE_EUREKAS
-    qt_eureka_disable();
-#endif /* QTHREAD_USE_EUREKAS */
     while (1) {
         qt_threadqueue_node_t *node = NULL;
 
@@ -1093,9 +1087,6 @@ static QINLINE qt_threadqueue_node_t *qthread_steal(qthread_shepherd_t *thief_sh
         i++;
         i *= (i < qlib->nshepherds - 1);
         if (i == 0) {
-#ifdef QTHREAD_USE_EUREKAS
-            qt_eureka_check(1);
-#endif /* QTHREAD_USE_EUREKAS */
 #ifdef HAVE_PTHREAD_YIELD
             pthread_yield();
 #elif defined(HAVE_SCHED_YIELD)
@@ -1174,18 +1165,12 @@ void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c
 
             case REMOVE_AND_CONTINUE: // remove, move to the next one
             {
-#ifdef QTHREAD_USE_EUREKAS
-                qthread_internal_assassinate(n->value);
-#endif /* QTHREAD_USE_EUREKAS */
                 FREE_TQNODE(n);
                 c->on_deck = NULL;
                 break;
             }
             case REMOVE_AND_STOP:     // remove, stop looking
             {
-#ifdef QTHREAD_USE_EUREKAS
-                qthread_internal_assassinate(n->value);
-#endif /* QTHREAD_USE_EUREKAS */
                 FREE_TQNODE(n);
                 c->on_deck = NULL;
                 goto fixup_on_deck;
@@ -1228,9 +1213,6 @@ void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c
                     c->qlength_stealable -= node->stealable;
                     freeme                = node;
                     node                  = node->prev;
-#ifdef QTHREAD_USE_EUREKAS
-                    qthread_internal_assassinate(t);
-#endif /* QTHREAD_USE_EUREKAS */
                     if (c->head == node) {
                         lp = &c->head;
                     } else {
@@ -1244,9 +1226,6 @@ void INTERNAL qt_threadqueue_private_filter(qt_threadqueue_private_t *restrict c
                     *rp = node->prev;
                     c->qlength--;
                     c->qlength_stealable -= node->stealable;
-#ifdef QTHREAD_USE_EUREKAS
-                    qthread_internal_assassinate(t);
-#endif /* QTHREAD_USE_EUREKAS */
                     FREE_TQNODE(node);
                     node = NULL;
                     break;
@@ -1321,9 +1300,6 @@ void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
                     q->qlength_stealable -= node->stealable;
                     freeme                = node;
                     node                  = node->prev;
-#ifdef QTHREAD_USE_EUREKAS
-                    qthread_internal_assassinate(t);
-#endif /* QTHREAD_USE_EUREKAS */
                     if (q->head == node) {
                         lp = &q->head;
                     } else {
@@ -1337,9 +1313,6 @@ void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
                     *rp = node->prev;
                     q->qlength--;
                     q->qlength_stealable -= node->stealable;
-#ifdef QTHREAD_USE_EUREKAS
-                    qthread_internal_assassinate(t);
-#endif /* QTHREAD_USE_EUREKAS */
                     FREE_TQNODE(node);
                     node = NULL;
                     break;

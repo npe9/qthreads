@@ -17,9 +17,6 @@
 #include "qt_qthread_struct.h"
 #include "qt_atomics.h"
 #include "qt_debug.h"
-#ifdef QTHREAD_USE_EUREKAS
-#include "qt_eurekas.h"
-#endif /* QTHREAD_USE_EUREKAS */
 #include "qt_subsystems.h"
 
 /* Note: this queue is SAFE to use with multiple de-queuers, with the caveat
@@ -220,22 +217,13 @@ qthread_t INTERNAL *qt_scheduler_get_thread(qt_threadqueue_t         *q,
                                             qt_threadqueue_private_t *QUNUSED(qc),
                                             uint_fast8_t              QUNUSED(active))
 {   /*{{{*/
-#ifdef QTHREAD_USE_EUREKAS
-    qt_eureka_disable();
-#endif /* QTHREAD_USE_EUREKAS */
     qthread_t *retval = qt_threadqueue_dequeue(q);
 
     qthread_debug(THREADQUEUE_CALLS, "q(%p)\n", q);
     if (retval == NULL) {
-#ifdef QTHREAD_USE_EUREKAS
-        qt_eureka_check(0);
-#endif /* QTHREAD_USE_EUREKAS */
         while (q->stack == NULL) {
             SPINLOCK_BODY();
         }
-#ifdef QTHREAD_USE_EUREKAS
-        qt_eureka_disable();
-#endif /* QTHREAD_USE_EUREKAS */
         retval = qt_threadqueue_dequeue(q);
     }
     assert(retval);
@@ -267,18 +255,12 @@ void INTERNAL qt_threadqueue_filter(qt_threadqueue_t       *q,
             {
                 qt_threadqueue_node_t *freeme = curs;
 
-#ifdef QTHREAD_USE_EUREKAS
-                qthread_internal_assassinate(t);
-#endif /* QTHREAD_USE_EUREKAS */
                 *ptr = curs->next;
                 curs = curs->next;
                 FREE_TQNODE(freeme);
                 break;
             }
             case REMOVE_AND_STOP: // remove, stop looking;
-#ifdef QTHREAD_USE_EUREKAS
-                qthread_internal_assassinate(t);
-#endif /* QTHREAD_USE_EUREKAS */
                 *ptr = curs->next;
                 FREE_TQNODE(curs);
                 return;
