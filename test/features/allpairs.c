@@ -17,11 +17,11 @@ static void assigni(const size_t startat,
                     qarray * q,
                     void *arg)
 {
-    int *ptr = (int *)qarray_elem_nomigrate(q, startat);
+		int *ptr = (int *)qarray_elem_nomigrate(q, startat);
 
-    for (size_t i = 0; i < (stopat - startat); i++) {
-        ptr[i] = (i + startat);
-    }
+		for (size_t i = 0; i < (stopat - startat); i++) {
+				ptr[i] = (i + startat);
+		}
 }
 
 static void assignrand(const size_t startat,
@@ -29,31 +29,31 @@ static void assignrand(const size_t startat,
                        qarray * q,
                        void *arg)
 {
-    int *ptr = (int *)qarray_elem_nomigrate(q, startat);
+		int *ptr = (int *)qarray_elem_nomigrate(q, startat);
 
-    for (size_t i = 0; i < (stopat - startat); i++) {
-        ptr[i] = random();
-    }
+		for (size_t i = 0; i < (stopat - startat); i++) {
+				ptr[i] = random();
+		}
 }
 
 #if 0                                  /* unused */
 static void printout(int *restrict * restrict out)
 {
-    size_t i;
+		size_t i;
 
-    for (i = 0; i < ASIZE; i++) {
-        size_t j;
+		for (i = 0; i < ASIZE; i++) {
+				size_t j;
 
-        for (j = 0; j < ASIZE; j++) {
-            if (out[i][j] == -1) {
-                printf("       _ ");
-            } else {
-                printf("%8i ", out[i][j]);
-            }
-            assert(out[i][j] == out[j][i]);
-        }
-        printf("\n");
-    }
+				for (j = 0; j < ASIZE; j++) {
+						if (out[i][j] == -1) {
+								printf("       _ ");
+						} else {
+								printf("%8i ", out[i][j]);
+						}
+						assert(out[i][j] == out[j][i]);
+				}
+				printf("\n");
+		}
 }
 
 #endif /* if 0 */
@@ -62,80 +62,80 @@ static void mult(const int *inta,
                  const int *intb,
                  int *restrict out)
 {
-    assert(*out == -1);
-    *out = (*inta) * (*intb);
+		assert(*out == -1);
+		*out = (*inta) * (*intb);
 }
 
 static void hammingdist(const int *inta,
                         const int *intb)
 {
-    unsigned int ham = *inta ^ *intb;
-    aligned_t hamdist = 0;
+		unsigned int ham = *inta ^ *intb;
+		aligned_t hamdist = 0;
 
-    while (ham != 0) {
-        hamdist += ham & 1;
-        ham >>= 1;
-    }
-    if (hamming > hamdist) {
-        qthread_lock(&hamming);
-        if (hamming > hamdist) {
-            hamming = hamdist;
-        }
-        qthread_unlock(&hamming);
-    }
+		while (ham != 0) {
+				hamdist += ham & 1;
+				ham >>= 1;
+		}
+		if (hamming > hamdist) {
+				qthread_lock(&hamming);
+				if (hamming > hamdist) {
+						hamming = hamdist;
+				}
+				qthread_unlock(&hamming);
+		}
 }
 
 int main(int argc,
          char *argv[])
 {
-    qarray *a1, *a2;
-    int **out;
-    size_t i;
+		qarray *a1, *a2;
+		int **out;
+		size_t i;
 
-    assert(qthread_initialize() == QTHREAD_SUCCESS);
-    CHECK_VERBOSE();
-    NUMARG(ASIZE, "TEST_ASIZE");
-    iprintf("ASIZE: %i\n", (int)ASIZE);
+		assert(qthread_initialize() == QTHREAD_SUCCESS);
+		CHECK_VERBOSE();
+		NUMARG(ASIZE, "TEST_ASIZE");
+		iprintf("ASIZE: %i\n", (int)ASIZE);
 
-    iprintf("%i threads\n", qthread_num_shepherds());
+		iprintf("%i threads\n", qthread_num_shepherds());
 
-    a1 = qarray_create_tight(ASIZE, sizeof(int));
-    a2 = qarray_create_tight(ASIZE, sizeof(int));
-    qarray_iter_loop(a1, 0, ASIZE, assigni, NULL);
-    qarray_iter_loop(a2, 0, ASIZE, assigni, NULL);
+		a1 = qarray_create_tight(ASIZE, sizeof(int));
+		a2 = qarray_create_tight(ASIZE, sizeof(int));
+		qarray_iter_loop(a1, 0, ASIZE, assigni, NULL);
+		qarray_iter_loop(a2, 0, ASIZE, assigni, NULL);
 
-    out = (int **)calloc(ASIZE, sizeof(int *));
-    assert(out);
-    for (i = 0; i < ASIZE; i++) {
-        size_t j;
-        out[i] = (int *)calloc(sizeof(int), ASIZE);
-        assert(out[i]);
-        for (j = 0; j < ASIZE; j++) {
-            out[i][j] = -1;
-        }
-    }
+		out = (int **)calloc(ASIZE, sizeof(int *));
+		assert(out);
+		for (i = 0; i < ASIZE; i++) {
+				size_t j;
+				out[i] = (int *)calloc(sizeof(int), ASIZE);
+				assert(out[i]);
+				for (j = 0; j < ASIZE; j++) {
+						out[i][j] = -1;
+				}
+		}
 
-    qt_allpairs_output(a1, a2, (dist_out_f)mult, (void **)out, sizeof(int));
-    /*if (verbose) {
-     * printout(out);
-     * } */
-    for (i = 0; i < ASIZE; i++) {
-        free(out[i]);
-    }
-    free(out);
+		qt_allpairs_output(a1, a2, (dist_out_f)mult, (void **)out, sizeof(int));
+		/*if (verbose) {
+		 * printout(out);
+		 * } */
+		for (i = 0; i < ASIZE; i++) {
+				free(out[i]);
+		}
+		free(out);
 
-    /* trial #2 */
-    qarray_iter_loop(a1, 0, ASIZE, assignrand, NULL);
-    qarray_iter_loop(a2, 0, ASIZE, assignrand, NULL);
+		/* trial #2 */
+		qarray_iter_loop(a1, 0, ASIZE, assignrand, NULL);
+		qarray_iter_loop(a2, 0, ASIZE, assignrand, NULL);
 
-    qt_allpairs(a1, a2, (dist_f)hammingdist);
+		qt_allpairs(a1, a2, (dist_f)hammingdist);
 
-    iprintf("minimum hamming distance = %lu\n", (unsigned long)hamming);
+		iprintf("minimum hamming distance = %lu\n", (unsigned long)hamming);
 
-    qarray_destroy(a1);
-    qarray_destroy(a2);
+		qarray_destroy(a1);
+		qarray_destroy(a2);
 
-    return 0;
+		return 0;
 }
 
 /* vim:set expandtab */

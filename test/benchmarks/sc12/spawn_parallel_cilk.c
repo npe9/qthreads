@@ -17,39 +17,39 @@
 
 static aligned_t null_task(void *args_)
 {
-    return 0;
+		return 0;
 }
 
-int main(int   argc,
+int main(int argc,
          char *argv[])
 {
-    unsigned long count = 1048576;
-    unsigned long i;
+		unsigned long count = 1048576;
+		unsigned long i;
 
-    qtimer_t timer;
-    double   total_time = 0.0;
+		qtimer_t timer;
+		double total_time = 0.0;
 
-    CHECK_VERBOSE();
+		CHECK_VERBOSE();
 
-    NUMARG(count, "MT_COUNT");
-    assert(0 != count);
+		NUMARG(count, "MT_COUNT");
+		assert(0 != count);
 
-    timer = qtimer_create();
-    qtimer_start(timer);
-    _Cilk_for(i = 0; i < count; i++) {
-        _Cilk_spawn null_task(NULL);
-    }
-    _Cilk_sync;
-    qtimer_stop(timer);
+		timer = qtimer_create();
+		qtimer_start(timer);
+		_Cilk_for(i = 0; i < count; i++) {
+				_Cilk_spawn null_task(NULL);
+		}
+		_Cilk_sync;
+		qtimer_stop(timer);
 
-    total_time = qtimer_secs(timer);
+		total_time = qtimer_secs(timer);
 
-    qtimer_destroy(timer);
+		qtimer_destroy(timer);
 
-    LOG_SPAWN_PARALLEL_YAML(count, total_time)
-    LOG_ENV_CILK_YAML()
+		LOG_SPAWN_PARALLEL_YAML(count, total_time)
+		LOG_ENV_CILK_YAML()
 
-    return 0;
+		return 0;
 }
 
 /* vim:set expandtab */

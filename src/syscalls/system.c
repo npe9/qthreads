@@ -20,34 +20,34 @@
 
 int qt_system(const char *command)
 {
-    qthread_t                *me  = qthread_internal_self();
-    qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
-    int                       ret;
+		qthread_t                *me  = qthread_internal_self();
+		qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
+		int ret;
 
-    assert(job);
-    job->next    = NULL;
-    job->thread  = me;
-    job->op      = SYSTEM;
-    job->args[0] = (uintptr_t)command;
+		assert(job);
+		job->next    = NULL;
+		job->thread  = me;
+		job->op      = SYSTEM;
+		job->args[0] = (uintptr_t)command;
 
-    assert(me->rdata);
+		assert(me->rdata);
 
-    me->rdata->blockedon.io = job;
-    me->thread_state        = QTHREAD_STATE_SYSCALL;
-    qthread_back_to_master(me);
-    ret = job->ret;
-    FREE_SYSCALLJOB(job);
-    return ret;
+		me->rdata->blockedon.io = job;
+		me->thread_state        = QTHREAD_STATE_SYSCALL;
+		qthread_back_to_master(me);
+		ret = job->ret;
+		FREE_SYSCALLJOB(job);
+		return ret;
 }
 
 #if HAVE_SYSCALL && HAVE_DECL_SYS_SYSTEM
 int system(const char *command)
 {
-    if (qt_blockable()) {
-        return qt_system(command);
-    } else {
-        return syscall(SYS_system, command);
-    }
+		if (qt_blockable()) {
+				return qt_system(command);
+		} else {
+				return syscall(SYS_system, command);
+		}
 }
 
 #endif

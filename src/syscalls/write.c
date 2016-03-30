@@ -19,42 +19,42 @@
 #include "qthread_innards.h" /* for qlib */
 #include "qt_qthread_mgmt.h"
 
-ssize_t qt_write(int         filedes,
+ssize_t qt_write(int filedes,
                  const void *buf,
-                 size_t      nbyte)
+                 size_t nbyte)
 {
-    qthread_t                *me  = qthread_internal_self();
-    qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
-    ssize_t                   ret;
+		qthread_t                *me  = qthread_internal_self();
+		qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
+		ssize_t ret;
 
-    assert(job);
-    job->next   = NULL;
-    job->thread = me;
-    job->op     = WRITE;
-    memcpy(&job->args[0], &filedes, sizeof(int));
-    job->args[1] = (uintptr_t)buf;
-    memcpy(&job->args[2], &nbyte, sizeof(size_t));
+		assert(job);
+		job->next   = NULL;
+		job->thread = me;
+		job->op     = WRITE;
+		memcpy(&job->args[0], &filedes, sizeof(int));
+		job->args[1] = (uintptr_t)buf;
+		memcpy(&job->args[2], &nbyte, sizeof(size_t));
 
-    assert(me->rdata);
+		assert(me->rdata);
 
-    me->rdata->blockedon.io = job;
-    me->thread_state        = QTHREAD_STATE_SYSCALL;
-    qthread_back_to_master(me);
-    ret = job->ret;
-    FREE_SYSCALLJOB(job);
-    return ret;
+		me->rdata->blockedon.io = job;
+		me->thread_state        = QTHREAD_STATE_SYSCALL;
+		qthread_back_to_master(me);
+		ret = job->ret;
+		FREE_SYSCALLJOB(job);
+		return ret;
 }
 
 #if HAVE_SYSCALL && HAVE_DECL_SYS_WRITE
-ssize_t write(int         filedes,
+ssize_t write(int filedes,
               const void *buf,
-              size_t      nbyte)
+              size_t nbyte)
 {
-    if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
-        return qt_write(filedes, buf, nbyte);
-    } else {
-        return syscall(SYS_write, filedes, buf, nbyte);
-    }
+		if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
+				return qt_write(filedes, buf, nbyte);
+		} else {
+				return syscall(SYS_write, filedes, buf, nbyte);
+		}
 }
 
 #endif /* if HAVE_SYSCALL && HAVE_DECL_SYS_WRITE */

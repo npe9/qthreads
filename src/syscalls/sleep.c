@@ -22,32 +22,32 @@
 
 unsigned int sleep(unsigned int seconds)
 {
-    if (qt_blockable()) {
-        qtimer_t t = qtimer_create();
-        qtimer_start(t);
-        do {
-            qthread_yield();
-            qtimer_stop(t);
-        } while (qtimer_secs(t) < seconds);
-        return 0;
-    } else {
+		if (qt_blockable()) {
+				qtimer_t t = qtimer_create();
+				qtimer_start(t);
+				do {
+						qthread_yield();
+						qtimer_stop(t);
+				} while (qtimer_secs(t) < seconds);
+				return 0;
+		} else {
 #if HAVE_SYSCALL
 # if HAVE_DECL_SYS_SLEEP
-        return syscall(SYS_sleep, seconds);
+				return syscall(SYS_sleep, seconds);
 
 # elif HAVE_DECL_SYS_USLEEP
-        return syscall(SYS_usleep, seconds * 1e6);
+				return syscall(SYS_usleep, seconds * 1e6);
 
 # elif HAVE_DECL_SYS_NANOSLEEP
-        return syscall(SYS_nanosleep, seconds * 1e9);
+				return syscall(SYS_nanosleep, seconds * 1e9);
 
 # else
-        return 0;
+				return 0;
 # endif
 #else   /* if HAVE_SYSCALL */
-        return 0;
+				return 0;
 #endif  /* if HAVE_SYSCALL */
-    }
+		}
 }
 
 /* vim:set expandtab: */

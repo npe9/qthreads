@@ -12,14 +12,14 @@
 int main(int argc,
          char *argv[])
 {
-    int cacheline = 0;
+		int cacheline = 0;
 
-    qthread_initialize();
-    cacheline = qthread_cacheline();
-    CHECK_VERBOSE();
-    iprintf("%i bytes\n", cacheline);
-    assert(cacheline > 0);
-    return 0;
+		qthread_initialize();
+		cacheline = qthread_cacheline();
+		CHECK_VERBOSE();
+		iprintf("%i bytes\n", cacheline);
+		assert(cacheline > 0);
+		return 0;
 }
 
 /* vim:set expandtab */

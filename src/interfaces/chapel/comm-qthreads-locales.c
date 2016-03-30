@@ -16,7 +16,7 @@
 #include "error.h"
 
 int64_t chpl_comm_default_num_locales(void) {
-  return 0;
+		return 0;
 }
 
 void chpl_comm_verify_num_locales(int64_t proposedNumLocales) {

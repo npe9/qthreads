@@ -21,30 +21,30 @@
 
 int usleep(useconds_t useconds)
 {
-    if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
-        qtimer_t t       = qtimer_create();
-        double   seconds = useconds * 1e-6;
-        qtimer_start(t);
-        do {
-            qthread_yield();
-            qtimer_stop(t);
-        } while (qtimer_secs(t) < seconds);
-        return 0;
-    } else {
+		if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
+				qtimer_t t       = qtimer_create();
+				double seconds = useconds * 1e-6;
+				qtimer_start(t);
+				do {
+						qthread_yield();
+						qtimer_stop(t);
+				} while (qtimer_secs(t) < seconds);
+				return 0;
+		} else {
 #if HAVE_SYSCALL
 # if HAVE_DECL_SYS_USLEEP
-        return syscall(SYS_usleep, useconds);
+				return syscall(SYS_usleep, useconds);
 
 # elif HAVE_DECL_SYS_NANOSLEEP
-        return syscall(SYS_nanosleep, useconds * 1e3);
+				return syscall(SYS_nanosleep, useconds * 1e3);
 
 # else
-        return 0;
+				return 0;
 # endif
 #else
-        return 0;
+				return 0;
 #endif  /* if HAVE_SYSCALL */
-    }
+		}
 }
 
 /* vim:set expandtab: */

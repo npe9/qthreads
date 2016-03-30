@@ -26,45 +26,45 @@
 #include "qthread_innards.h" /* for qlib */
 #include "qt_qthread_mgmt.h"
 
-pid_t qt_wait4(pid_t          pid,
+pid_t qt_wait4(pid_t pid,
                int           *stat_loc,
-               int            options,
+               int options,
                struct rusage *rusage)
 {
-    qthread_t                *me  = qthread_internal_self();
-    qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
-    pid_t                     ret;
+		qthread_t                *me  = qthread_internal_self();
+		qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
+		pid_t ret;
 
-    assert(job);
-    job->next   = NULL;
-    job->thread = me;
-    job->op     = WAIT4;
-    memcpy(&job->args[0], &pid, sizeof(pid_t));
-    job->args[1] = (uintptr_t)stat_loc;
-    memcpy(&job->args[2], &options, sizeof(int));
-    job->args[3] = (uintptr_t)rusage;
+		assert(job);
+		job->next   = NULL;
+		job->thread = me;
+		job->op     = WAIT4;
+		memcpy(&job->args[0], &pid, sizeof(pid_t));
+		job->args[1] = (uintptr_t)stat_loc;
+		memcpy(&job->args[2], &options, sizeof(int));
+		job->args[3] = (uintptr_t)rusage;
 
-    assert(me->rdata);
+		assert(me->rdata);
 
-    me->rdata->blockedon.io = job;
-    me->thread_state        = QTHREAD_STATE_SYSCALL;
-    qthread_back_to_master(me);
-    ret = job->ret;
-    FREE_SYSCALLJOB(job);
-    return ret;
+		me->rdata->blockedon.io = job;
+		me->thread_state        = QTHREAD_STATE_SYSCALL;
+		qthread_back_to_master(me);
+		ret = job->ret;
+		FREE_SYSCALLJOB(job);
+		return ret;
 }
 
 #if HAVE_SYSCALL && HAVE_DECL_SYS_WAIT4
-pid_t wait4(pid_t          pid,
+pid_t wait4(pid_t pid,
             int           *stat_loc,
-            int            options,
+            int options,
             struct rusage *rusage)
 {
-    if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
-        return qt_wait4(pid, stat_loc, options, rusage);
-    } else {
-        return syscall(SYS_wait4, pid, stat_loc, options, rusage);
-    }
+		if ((qlib != NULL) && (qthread_internal_self() != NULL)) {
+				return qt_wait4(pid, stat_loc, options, rusage);
+		} else {
+				return syscall(SYS_wait4, pid, stat_loc, options, rusage);
+		}
 }
 
 #endif /* if HAVE_SYSCALL && HAVE_DECL_SYS_WAIT4 */

@@ -20,41 +20,41 @@
 #include "qt_qthread_mgmt.h"
 
 int qt_poll(struct pollfd fds[],
-            nfds_t        nfds,
-            int           timeout)
+            nfds_t nfds,
+            int timeout)
 {
-    qthread_t                *me  = qthread_internal_self();
-    qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
-    int                       ret;
+		qthread_t                *me  = qthread_internal_self();
+		qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
+		int ret;
 
-    assert(job);
-    job->next    = NULL;
-    job->thread  = me;
-    job->op      = POLL;
-    job->args[0] = (uintptr_t)&(fds[0]);
-    memcpy(&job->args[1], &nfds, sizeof(nfds_t));
-    memcpy(&job->args[2], &timeout, sizeof(int));
+		assert(job);
+		job->next    = NULL;
+		job->thread  = me;
+		job->op      = POLL;
+		job->args[0] = (uintptr_t)&(fds[0]);
+		memcpy(&job->args[1], &nfds, sizeof(nfds_t));
+		memcpy(&job->args[2], &timeout, sizeof(int));
 
-    assert(me->rdata);
+		assert(me->rdata);
 
-    me->rdata->blockedon.io = job;
-    me->thread_state        = QTHREAD_STATE_SYSCALL;
-    qthread_back_to_master(me);
-    ret = job->ret;
-    FREE_SYSCALLJOB(job);
-    return ret;
+		me->rdata->blockedon.io = job;
+		me->thread_state        = QTHREAD_STATE_SYSCALL;
+		qthread_back_to_master(me);
+		ret = job->ret;
+		FREE_SYSCALLJOB(job);
+		return ret;
 }
 
 #if HAVE_SYSCALL && HAVE_DECL_SYS_POLL
 int poll(struct pollfd fds[],
-         nfds_t        nfds,
-         int           timeout)
+         nfds_t nfds,
+         int timeout)
 {
-    if (qt_blockable()) {
-        return qt_poll(fds, nfds, timeout);
-    } else {
-        return syscall(SYS_poll, fds, nfds, timeout);
-    }
+		if (qt_blockable()) {
+				return qt_poll(fds, nfds, timeout);
+		} else {
+				return syscall(SYS_poll, fds, nfds, timeout);
+		}
 }
 
 #endif /* if HAVE_SYSCALL && HAVE_DECL_SYS_POLL */

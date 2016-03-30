@@ -52,27 +52,27 @@
 
 # define PROFILE_BIN_CNT 18
 # define PROFILE_BIN_INCR(counter,size) \
-    do { \
-        size_t i; \
-        for (i = 0; i < PROFILE_BIN_CNT-1; i++) { \
-            size_t bin_size = 8 << i; \
-            if (size <= bin_size) { \
-                (void)qthread_incr(&counter[i],1); \
-                break; \
-            } \
-        } \
-        if (i == PROFILE_BIN_CNT) { \
-            (void)qthread_incr(&counter[PROFILE_BIN_CNT-1],1); \
-        } \
-    } \
-    while (0)
+		do { \
+				size_t i; \
+				for (i = 0; i < PROFILE_BIN_CNT-1; i++) { \
+						size_t bin_size = 8 << i; \
+						if (size <= bin_size) { \
+								(void)qthread_incr(&counter[i],1); \
+								break; \
+						} \
+				} \
+				if (i == PROFILE_BIN_CNT) { \
+						(void)qthread_incr(&counter[PROFILE_BIN_CNT-1],1); \
+				} \
+		} \
+		while (0)
 # define PROFILE_BIN_PRINT(counter) \
-    do { \
-        for (size_t i = 0; i < PROFILE_BIN_CNT-1; i++) { \
-            fprintf(stderr, "comm put size %lu: %lu\n", 8<<i, counter[i]); \
-        } \
-        fprintf(stderr, "comm put size large: %lu\n", counter[PROFILE_BIN_CNT-1]); \
-    } while (0)
+		do { \
+				for (size_t i = 0; i < PROFILE_BIN_CNT-1; i++) { \
+						fprintf(stderr, "comm put size %lu: %lu\n", 8<<i, counter[i]); \
+				} \
+				fprintf(stderr, "comm put size large: %lu\n", counter[PROFILE_BIN_CNT-1]); \
+		} while (0)
 
 static aligned_t profile_comm_broadcast_private = 0;
 static aligned_t profile_comm_barrier = 0;
@@ -89,18 +89,18 @@ static aligned_t profile_comm_fork_fast_size[PROFILE_BIN_CNT] = {0};
 
 static void profile_print(void)
 {
-    fprintf(stderr, "comm broadcast_private: %lu\n", (unsigned long)profile_comm_broadcast_private);
-    fprintf(stderr, "comm barrier: %lu\n", (unsigned long)profile_comm_barrier);
-    fprintf(stderr, "comm put: %lu\n", (unsigned long)profile_comm_put);
-    PROFILE_BIN_PRINT(profile_comm_put_msg_size);
-    fprintf(stderr, "comm get: %lu\n", (unsigned long)profile_comm_get);
-    PROFILE_BIN_PRINT(profile_comm_get_msg_size);
-    fprintf(stderr, "comm fork: %lu\n", (unsigned long)profile_comm_fork);
-    PROFILE_BIN_PRINT(profile_comm_fork_size);
-    fprintf(stderr, "comm fork_nb: %lu\n", (unsigned long)profile_comm_fork_nb);
-    PROFILE_BIN_PRINT(profile_comm_fork_nb_size);
-    fprintf(stderr, "comm fork_fast: %lu\n", (unsigned long)profile_comm_fork_fast);
-    PROFILE_BIN_PRINT(profile_comm_fork_fast_size);
+		fprintf(stderr, "comm broadcast_private: %lu\n", (unsigned long)profile_comm_broadcast_private);
+		fprintf(stderr, "comm barrier: %lu\n", (unsigned long)profile_comm_barrier);
+		fprintf(stderr, "comm put: %lu\n", (unsigned long)profile_comm_put);
+		PROFILE_BIN_PRINT(profile_comm_put_msg_size);
+		fprintf(stderr, "comm get: %lu\n", (unsigned long)profile_comm_get);
+		PROFILE_BIN_PRINT(profile_comm_get_msg_size);
+		fprintf(stderr, "comm fork: %lu\n", (unsigned long)profile_comm_fork);
+		PROFILE_BIN_PRINT(profile_comm_fork_size);
+		fprintf(stderr, "comm fork_nb: %lu\n", (unsigned long)profile_comm_fork_nb);
+		PROFILE_BIN_PRINT(profile_comm_fork_nb_size);
+		fprintf(stderr, "comm fork_fast: %lu\n", (unsigned long)profile_comm_fork_fast);
+		PROFILE_BIN_PRINT(profile_comm_fork_fast_size);
 }
 #else /* ! CHAPEL_PROFILE */
 # define PROFILE_INCR(counter,count)
@@ -110,83 +110,84 @@ static void profile_print(void)
 
 /* "Segment" information table */
 typedef struct seginfo_s {
-    void * addr;
-    size_t size;
+		void * addr;
+		size_t size;
 } seginfo_t;
 
 static seginfo_t * seginfo_table = NULL;
 
 /******************************************************************************
- * Remote Actions                                                             *
- ******************************************************************************/
+* Remote Actions                                                             *
+******************************************************************************/
 
 static aligned_t spawn_wrapper(void *arg);
 static aligned_t bcast_seginfo(void *arg_);
 static aligned_t bcast_private(void *arg_);
 
 static qthread_f
-chapel_remote_functions[4] = {
-    spawn_wrapper,
-    bcast_seginfo,
-    bcast_private,
-    NULL};
+        chapel_remote_functions[4] = {
+		spawn_wrapper,
+		bcast_seginfo,
+		bcast_private,
+		NULL
+};
 
 aligned_t bcast_seginfo(void *arg_)
 {
-    seginfo_t * buf = (seginfo_t *)arg_;
+		seginfo_t * buf = (seginfo_t *)arg_;
 
-    assert(buf);
-    assert(seginfo_table);
+		assert(buf);
+		assert(seginfo_table);
 
-    qthread_debug(CHAPEL_DETAILS, "[%d] buf=%p buf[0].addr=%p, buf[0].size=%d\n", chpl_localeID, buf, buf[0].addr, buf[0].size);
+		qthread_debug(CHAPEL_DETAILS, "[%d] buf=%p buf[0].addr=%p, buf[0].size=%d\n", chpl_localeID, buf, buf[0].addr, buf[0].size);
 
-    memcpy(seginfo_table, buf, chpl_numLocales * sizeof(seginfo_t));
+		memcpy(seginfo_table, buf, chpl_numLocales * sizeof(seginfo_t));
 
-    qthread_debug(CHAPEL_DETAILS, "[%d] seginfo_table=%p seginfo_table[0].addr=%p, seginfo_table[0].size=%d\n", chpl_localeID, seginfo_table, seginfo_table[0].addr, seginfo_table[0].size);
+		qthread_debug(CHAPEL_DETAILS, "[%d] seginfo_table=%p seginfo_table[0].addr=%p, seginfo_table[0].size=%d\n", chpl_localeID, seginfo_table, seginfo_table[0].addr, seginfo_table[0].size);
 
-    return 0;
+		return 0;
 }
 
 typedef struct bcast_private_args_s {
-    int id;
-    int32_t size;
-    uint8_t data[];
+		int id;
+		int32_t size;
+		uint8_t data[];
 } bcast_private_args_t;
 
 aligned_t bcast_private(void *arg_)
 {
-    bcast_private_args_t * arg = (bcast_private_args_t *)arg_;
+		bcast_private_args_t * arg = (bcast_private_args_t *)arg_;
 
-    assert(arg);
+		assert(arg);
 
-    qthread_debug(CHAPEL_DETAILS, "[%d] arg={.id=%d; .size=%d; .data=?}\n", chpl_localeID, arg->id, arg->size);
+		qthread_debug(CHAPEL_DETAILS, "[%d] arg={.id=%d; .size=%d; .data=?}\n", chpl_localeID, arg->id, arg->size);
 
-    memcpy(chpl_private_broadcast_table[arg->id], arg->data, arg->size);
+		memcpy(chpl_private_broadcast_table[arg->id], arg->data, arg->size);
 
-    return 0;
+		return 0;
 }
 
 /******************************************************************************
- * Launcher Methods                                                           *
- ******************************************************************************/
+* Launcher Methods                                                           *
+******************************************************************************/
 
 int64_t chpl_comm_default_num_locales(void) {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 
-    return chpl_specify_locales_error();
+		return chpl_specify_locales_error();
 }
 
 void chpl_comm_verify_num_locales(int64_t proposedNumLocales) {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 
-    return;
+		return;
 }
 
 /******************************************************************************
- * Initialization                                                             *
- ******************************************************************************/
+* Initialization                                                             *
+******************************************************************************/
 
 //
 // returns the maximum number of threads that can be handled
@@ -196,10 +197,10 @@ void chpl_comm_verify_num_locales(int64_t proposedNumLocales) {
 //
 int32_t chpl_comm_getMaxThreads(void)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 
-    return 0;
+		return 0;
 }
 
 //
@@ -210,76 +211,76 @@ int32_t chpl_comm_getMaxThreads(void)
 //
 void chpl_comm_init(int *argc_p, char ***argv_p)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
 
-    // Set stack size >= 8 pages (lower bound derived from experience)
-    unsigned long const default_stack_size = 32768;
-    unsigned long const stack_size = 
-        qt_internal_get_env_num("STACK_SIZE",
-                                default_stack_size,
-                                default_stack_size);
-    char stack_size_str[100] = {0};
-    if (default_stack_size > stack_size) {
-        snprintf(stack_size_str, 99, "%lu", default_stack_size);
-    } else {
-        snprintf(stack_size_str, 99, "%lu", stack_size);
-    }
-    setenv("QT_STACK_SIZE", stack_size_str, 1);
+		// Set stack size >= 8 pages (lower bound derived from experience)
+		unsigned long const default_stack_size = 32768;
+		unsigned long const stack_size =
+		        qt_internal_get_env_num("STACK_SIZE",
+		                                default_stack_size,
+		                                default_stack_size);
+		char stack_size_str[100] = {0};
+		if (default_stack_size > stack_size) {
+				snprintf(stack_size_str, 99, "%lu", default_stack_size);
+		} else {
+				snprintf(stack_size_str, 99, "%lu", stack_size);
+		}
+		setenv("QT_STACK_SIZE", stack_size_str, 1);
 
-    /* Initialize SPR:                              *
-     * - All locales participate in initialization. */
-    int const rc = spr_init(SPR_SPMD, chapel_remote_functions);
-    assert(SPR_OK == rc);
+		/* Initialize SPR:                              *
+		* - All locales participate in initialization. */
+		int const rc = spr_init(SPR_SPMD, chapel_remote_functions);
+		assert(SPR_OK == rc);
 
-    /* Record locale info */
-    chpl_localeID = spr_locale_id();
-    chpl_numLocales = spr_num_locales();
+		/* Record locale info */
+		chpl_localeID = spr_locale_id();
+		chpl_numLocales = spr_num_locales();
 
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] initialized SPR with %d locales\n", chpl_localeID, chpl_numLocales);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] initialized SPR with %d locales\n", chpl_localeID, chpl_numLocales);
 
-    /* Set up segment information table */
+		/* Set up segment information table */
 #undef malloc
-    seginfo_table = malloc(chpl_numLocales * sizeof(seginfo_t));
+		seginfo_table = malloc(chpl_numLocales * sizeof(seginfo_t));
 #define malloc dont_use_malloc_use_chpl_mem_allocMany_instead
 
-    if (0 == chpl_localeID) {
-        int i;
+		if (0 == chpl_localeID) {
+				int i;
 
-        int global_table_size = chpl_numGlobalsOnHeap * sizeof(void *) + getpagesize();
+				int global_table_size = chpl_numGlobalsOnHeap * sizeof(void *) + getpagesize();
 #undef malloc
-        void * global_table = malloc(global_table_size);
+				void * global_table = malloc(global_table_size);
 #define malloc dont_use_malloc_use_chpl_mem_allocMany_instead
-       
-        // Make sure segment is page-aligned.
-        seginfo_table[0].addr = ((void *)(((uint8_t *)global_table) +
-                                 (((((uintptr_t)global_table) % getpagesize()) == 0) ? 0 :
-                                  (getpagesize() - (((uintptr_t)global_table) % getpagesize())))));
-        seginfo_table[0].size = global_table_size;
 
-        for (i = 1; i < chpl_numLocales; i++) {
-            seginfo_table[i].addr = NULL;
-            seginfo_table[i].size = 0;
-        }
-    }
+				// Make sure segment is page-aligned.
+				seginfo_table[0].addr = ((void *)(((uint8_t *)global_table) +
+				                                  (((((uintptr_t)global_table) % getpagesize()) == 0) ? 0 :
+				                                   (getpagesize() - (((uintptr_t)global_table) % getpagesize())))));
+				seginfo_table[0].size = global_table_size;
 
-    chpl_comm_barrier("waiting for seginfo table setup at root");
+				for (i = 1; i < chpl_numLocales; i++) {
+						seginfo_table[i].addr = NULL;
+						seginfo_table[i].size = 0;
+				}
+		}
 
-    // Broadcast segment info
-    if (0 == chpl_localeID) {
-        int i;
-        aligned_t rets[chpl_numLocales];
-        for (i = 1; i < chpl_numLocales; i++) {
-            qthread_fork_remote(bcast_seginfo, seginfo_table, &rets[i], i,
-                                chpl_numLocales * sizeof(seginfo_t));
-        }
-        for (i = 1; i < chpl_numLocales; i++) {
-            qthread_readFF(&rets[i], &rets[i]);
-        }
-    }
+		chpl_comm_barrier("waiting for seginfo table setup at root");
 
-    chpl_comm_barrier("waiting for seginfo table bcast");
+		// Broadcast segment info
+		if (0 == chpl_localeID) {
+				int i;
+				aligned_t rets[chpl_numLocales];
+				for (i = 1; i < chpl_numLocales; i++) {
+						qthread_fork_remote(bcast_seginfo, seginfo_table, &rets[i], i,
+						                    chpl_numLocales * sizeof(seginfo_t));
+				}
+				for (i = 1; i < chpl_numLocales; i++) {
+						qthread_readFF(&rets[i], &rets[i]);
+				}
+		}
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		chpl_comm_barrier("waiting for seginfo table bcast");
+
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -287,9 +288,9 @@ void chpl_comm_init(int *argc_p, char ***argv_p)
 // to, after the memory layer is initialized.
 //
 void chpl_comm_post_mem_init(void)
-{ 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+{
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -302,10 +303,10 @@ void chpl_comm_post_mem_init(void)
 int32_t chpl_comm_run_in_gdb(int argc, char * argv[],
                              int gdbArgnum, int * status)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 
-    return 0;
+		return 0;
 }
 
 //
@@ -314,8 +315,8 @@ int32_t chpl_comm_run_in_gdb(int argc, char * argv[],
 //
 void chpl_comm_post_task_init(void)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -328,12 +329,12 @@ void chpl_comm_post_task_init(void)
 // Cannot call spr_unify() here because there is a barrier afterwards.
 void chpl_comm_rollcall(void)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
 
-    chpl_msg(2, "executing on locale %d of %d locale(s): %s\n", chpl_localeID,
-             chpl_numLocales, chpl_localeName());
+		chpl_msg(2, "executing on locale %d of %d locale(s): %s\n", chpl_localeID,
+		         chpl_numLocales, chpl_localeName());
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -342,12 +343,12 @@ void chpl_comm_rollcall(void)
 //
 void chpl_comm_desired_shared_heap(void** start_p, size_t* size_p)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
 
-    *start_p = NULL;
-    *size_p  = 0;
+		*start_p = NULL;
+		*size_p  = 0;
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -356,12 +357,12 @@ void chpl_comm_desired_shared_heap(void** start_p, size_t* size_p)
 //
 void chpl_comm_alloc_registry(int numGlobals)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
 
-    // Use the statically allocate array defined in generated C code.
-    chpl_globals_registry = chpl_globals_registry_static;
+		// Use the statically allocate array defined in generated C code.
+		chpl_globals_registry = chpl_globals_registry_static;
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -374,19 +375,19 @@ void chpl_comm_alloc_registry(int numGlobals)
 //
 void chpl_comm_broadcast_global_vars(int numGlobals)
 {
-    int i;
+		int i;
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
 
-    if (0 != chpl_localeID) {
-        for (i = 0; i < numGlobals; i++) {
-            chpl_comm_get(chpl_globals_registry[i], 0,
-                          &((void **)seginfo_table[0].addr)[i],
-                          sizeof(void *), -1, 1, 0, "");
-        }
-    }
+		if (0 != chpl_localeID) {
+				for (i = 0; i < numGlobals; i++) {
+						chpl_comm_get(chpl_globals_registry[i], 0,
+						              &((void **)seginfo_table[0].addr)[i],
+						              sizeof(void *), -1, 1, 0, "");
+				}
+		}
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }
 
 //
@@ -396,47 +397,47 @@ void chpl_comm_broadcast_global_vars(int numGlobals)
 //
 void chpl_comm_broadcast_private(int id, int32_t size, int32_t tid)
 {
-    int i;
-    bcast_private_args_t *payload;
+		int i;
+		bcast_private_args_t *payload;
 
-    PROFILE_INCR(profile_comm_broadcast_private,1);
+		PROFILE_INCR(profile_comm_broadcast_private,1);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin id=%d, size=%d, tid=%d\n", chpl_localeID, id, size, tid);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin id=%d, size=%d, tid=%d\n", chpl_localeID, id, size, tid);
 
-    payload = chpl_mem_allocMany(1, sizeof(bcast_private_args_t) + size, 
-                                 CHPL_RT_MD_COMM_PRIVATE_BROADCAST_DATA, 0, 0);
-    payload->id = id;
-    payload->size = size;
-    memcpy(payload->data, chpl_private_broadcast_table[id], size);
+		payload = chpl_mem_allocMany(1, sizeof(bcast_private_args_t) + size,
+		                             CHPL_RT_MD_COMM_PRIVATE_BROADCAST_DATA, 0, 0);
+		payload->id = id;
+		payload->size = size;
+		memcpy(payload->data, chpl_private_broadcast_table[id], size);
 
-    qthread_debug(CHAPEL_DETAILS, "[%d] payload={.id=%d; .size=%d; .data=?}\n", chpl_localeID, payload->id, payload->size);
+		qthread_debug(CHAPEL_DETAILS, "[%d] payload={.id=%d; .size=%d; .data=?}\n", chpl_localeID, payload->id, payload->size);
 
-    aligned_t rets[chpl_numLocales];
-    for (i = 0; i < chpl_numLocales; i++) {
-        if (i != chpl_localeID) {
-            qthread_fork_remote(bcast_private, payload, &rets[i], i,
-                                sizeof(bcast_private_args_t) + size);
-        }
-    }
-    for (i = 0; i < chpl_numLocales; i++) {
-        if (i != chpl_localeID) {
-            qthread_readFF(&rets[i], &rets[i]);
-        }
-    }
+		aligned_t rets[chpl_numLocales];
+		for (i = 0; i < chpl_numLocales; i++) {
+				if (i != chpl_localeID) {
+						qthread_fork_remote(bcast_private, payload, &rets[i], i,
+						                    sizeof(bcast_private_args_t) + size);
+				}
+		}
+		for (i = 0; i < chpl_numLocales; i++) {
+				if (i != chpl_localeID) {
+						qthread_readFF(&rets[i], &rets[i]);
+				}
+		}
 
-    chpl_mem_free(payload,0,0);
+		chpl_mem_free(payload,0,0);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end id=%d, size=%d, tid=%d\n", chpl_localeID, id, size, tid);
+		qthread_debug(CHAPEL_CALLS, "[%d] end id=%d, size=%d, tid=%d\n", chpl_localeID, id, size, tid);
 }
 
 void chpl_comm_barrier(const char *msg)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin: %s\n", chpl_localeID, msg);
-    PROFILE_INCR(profile_comm_barrier,1);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin: %s\n", chpl_localeID, msg);
+		PROFILE_INCR(profile_comm_barrier,1);
 
-    spr_locale_barrier();
+		spr_locale_barrier();
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end: %s\n", chpl_localeID, msg);
+		qthread_debug(CHAPEL_CALLS, "[%d] end: %s\n", chpl_localeID, msg);
 }
 
 //
@@ -449,26 +450,26 @@ void chpl_comm_barrier(const char *msg)
 //
 void chpl_comm_pre_task_exit(int all)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin all=%d\n", chpl_localeID, all);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin all=%d\n", chpl_localeID, all);
 
-    if (all) {
-        if (0 != chpl_localeID) {
-            qthread_debug(CHAPEL_BEHAVIOR, "[%d] calling spr_unify()\n", chpl_localeID);
+		if (all) {
+				if (0 != chpl_localeID) {
+						qthread_debug(CHAPEL_BEHAVIOR, "[%d] calling spr_unify()\n", chpl_localeID);
 
-            int const rc = spr_unify();
-            assert(SPR_OK == rc);
-        } else {
-            qthread_debug(CHAPEL_BEHAVIOR, "[%d] initiating locale shutdown\n", chpl_localeID);
-        }
-    }
+						int const rc = spr_unify();
+						assert(SPR_OK == rc);
+				} else {
+						qthread_debug(CHAPEL_BEHAVIOR, "[%d] initiating locale shutdown\n", chpl_localeID);
+				}
+		}
 
 #ifdef CHAPEL_PROFILE
-    profile_print();
+		profile_print();
 #endif /* CHAPEL_PROFILE */
 
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] locale shutting down\n", chpl_localeID);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] locale shutting down\n", chpl_localeID);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end all=%d\n", chpl_localeID, all);
+		qthread_debug(CHAPEL_CALLS, "[%d] end all=%d\n", chpl_localeID, all);
 }
 
 //
@@ -485,14 +486,14 @@ void chpl_comm_pre_task_exit(int all)
 //   Chapel's program termination is not yet fully thought out.
 //
 void chpl_comm_exit(int all, int status)
-{ 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin all=%d, status=%d\n", chpl_localeID, all, status);
-    qthread_debug(CHAPEL_CALLS, "[%d] end all=%d, status=%d\n", chpl_localeID, all, status);
+{
+		qthread_debug(CHAPEL_CALLS, "[%d] begin all=%d, status=%d\n", chpl_localeID, all, status);
+		qthread_debug(CHAPEL_CALLS, "[%d] end all=%d, status=%d\n", chpl_localeID, all, status);
 }
 
 /******************************************************************************
- * Data Movement: put                                                         *
- ******************************************************************************/
+* Data Movement: put                                                         *
+******************************************************************************/
 
 //
 // put 'size' bytes of local data at 'addr' to remote data at
@@ -505,22 +506,22 @@ void  chpl_comm_put(void* addr, int32_t locale, void* raddr,
                     int32_t elemSize, int32_t typeIndex, int32_t len,
                     int ln, chpl_string fn)
 {
-    uint32_t const size = elemSize * len;
+		uint32_t const size = elemSize * len;
 
-    PROFILE_INCR(profile_comm_put,1);
-    PROFILE_BIN_INCR(profile_comm_put_msg_size,elemSize);
+		PROFILE_INCR(profile_comm_put,1);
+		PROFILE_BIN_INCR(profile_comm_put_msg_size,elemSize);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] putting from %p to (%d,%p) of size %d\n", chpl_localeID, addr, locale, raddr, size);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] putting from %p to (%d,%p) of size %d\n", chpl_localeID, addr, locale, raddr, size);
 
-    if (chpl_localeID == locale) {
-        memmove(raddr, addr, size);
-    } else {
-        int const rc = spr_put(locale, raddr, addr, size);
-        assert(SPR_OK == rc);
-    }
+		if (chpl_localeID == locale) {
+				memmove(raddr, addr, size);
+		} else {
+				int const rc = spr_put(locale, raddr, addr, size);
+				assert(SPR_OK == rc);
+		}
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
+		qthread_debug(CHAPEL_CALLS, "[%d] end addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
 }
 
 //
@@ -534,72 +535,72 @@ void  chpl_comm_get(void *addr, int32_t locale, void* raddr,
                     int32_t elemSize, int32_t typeIndex, int32_t len,
                     int ln, chpl_string fn)
 {
-    uint32_t const size = elemSize *len;
-  
-    PROFILE_INCR(profile_comm_get,1);
-    PROFILE_BIN_INCR(profile_comm_get_msg_size,elemSize);
+		uint32_t const size = elemSize *len;
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] getting from (%d,%p) to %p of size %d\n", chpl_localeID, locale, raddr, addr, size);
+		PROFILE_INCR(profile_comm_get,1);
+		PROFILE_BIN_INCR(profile_comm_get_msg_size,elemSize);
 
-    if (chpl_localeID == locale) {
-        memcpy(addr, raddr, size);
-    } else {
-        int const rc = spr_get(addr, locale, raddr, size);
-        assert(SPR_OK == rc);
-    }
+		qthread_debug(CHAPEL_CALLS, "[%d] begin addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] getting from (%d,%p) to %p of size %d\n", chpl_localeID, locale, raddr, addr, size);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
+		if (chpl_localeID == locale) {
+				memcpy(addr, raddr, size);
+		} else {
+				int const rc = spr_get(addr, locale, raddr, size);
+				assert(SPR_OK == rc);
+		}
+
+		qthread_debug(CHAPEL_CALLS, "[%d] end addr=%p, locale=%d, raddr=%p, elemSize=%d, len=%d\n", chpl_localeID, addr, locale, raddr, elemSize, len);
 }
 
 /******************************************************************************
- * Remote Spawning                                                            *
- ******************************************************************************/
+* Remote Spawning                                                            *
+******************************************************************************/
 
 typedef struct {
-    chpl_bool     serial_state;
-    chpl_fn_int_t fid;
-    int           arg_size;
-    uint8_t       arg[0];
+		chpl_bool serial_state;
+		chpl_fn_int_t fid;
+		int arg_size;
+		uint8_t arg[0];
 } spawn_wrapper_args_t;
 
 static aligned_t spawn_wrapper(void *arg)
 {
-    spawn_wrapper_args_t * const rarg = arg;
+		spawn_wrapper_args_t * const rarg = arg;
 
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] executing fn %d with arg-size %d\n", chpl_localeID, rarg->fid, rarg->arg_size);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] executing fn %d with arg-size %d\n", chpl_localeID, rarg->fid, rarg->arg_size);
 
-    chpl_task_setSerial(rarg->serial_state);
-    (*chpl_ftable[rarg->fid])(rarg->arg);
+		chpl_task_setSerial(rarg->serial_state);
+		(*chpl_ftable[rarg->fid])(rarg->arg);
 
-    return 0;
+		return 0;
 }
 
-static inline void spawn(int locale, chpl_fn_int_t fid, void *arg, 
-                                int32_t arg_size, int32_t arg_tid, aligned_t *ret)
+static inline void spawn(int locale, chpl_fn_int_t fid, void *arg,
+                         int32_t arg_size, int32_t arg_tid, aligned_t *ret)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin: locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin: locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
 
-        spawn_wrapper_args_t *wargs;
-    size_t const wargs_size = sizeof(spawn_wrapper_args_t) + arg_size;
+		spawn_wrapper_args_t *wargs;
+		size_t const wargs_size = sizeof(spawn_wrapper_args_t) + arg_size;
 
-    wargs = (spawn_wrapper_args_t *)chpl_mem_allocMany(1, wargs_size, CHPL_RT_MD_COMM_FORK_SEND_INFO, 0, 0);
-        wargs->serial_state = chpl_task_getSerial();
-    wargs->fid = fid;
-    wargs->arg_size = arg_size;
-    memcpy(&(wargs->arg), arg, arg_size);
+		wargs = (spawn_wrapper_args_t *)chpl_mem_allocMany(1, wargs_size, CHPL_RT_MD_COMM_FORK_SEND_INFO, 0, 0);
+		wargs->serial_state = chpl_task_getSerial();
+		wargs->fid = fid;
+		wargs->arg_size = arg_size;
+		memcpy(&(wargs->arg), arg, arg_size);
 
-    if (chpl_localeID == locale) {
-        int const rc = qthread_fork_copyargs(spawn_wrapper, wargs, wargs_size, ret);
-        assert(QTHREAD_SUCCESS == rc);
-    } else {
-        int const rc = qthread_fork_remote(spawn_wrapper, wargs, ret, locale, wargs_size);
-        assert(SPR_OK == rc);
-    }
+		if (chpl_localeID == locale) {
+				int const rc = qthread_fork_copyargs(spawn_wrapper, wargs, wargs_size, ret);
+				assert(QTHREAD_SUCCESS == rc);
+		} else {
+				int const rc = qthread_fork_remote(spawn_wrapper, wargs, ret, locale, wargs_size);
+				assert(SPR_OK == rc);
+		}
 
-    chpl_mem_free(wargs, 0, NULL);
+		chpl_mem_free(wargs, 0, NULL);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end: locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] end: locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
 }
 
 //
@@ -611,20 +612,20 @@ static inline void spawn(int locale, chpl_fn_int_t fid, void *arg,
 void chpl_comm_fork(int locale, chpl_fn_int_t fid,
                     void *arg, int32_t arg_size, int32_t arg_tid)
 {
-    aligned_t ret;
+		aligned_t ret;
 
-    PROFILE_INCR(profile_comm_fork,1);
-    PROFILE_BIN_INCR(profile_comm_fork_size,arg_size);
+		PROFILE_INCR(profile_comm_fork,1);
+		PROFILE_BIN_INCR(profile_comm_fork_size,arg_size);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
 
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] (blocking) forking fn %d with arg-size %d\n", chpl_localeID, fid, arg_size);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] (blocking) forking fn %d with arg-size %d\n", chpl_localeID, fid, arg_size);
 
-    qthread_empty(&ret);
-    spawn(locale, fid, arg, arg_size, arg_tid, &ret);
-    qthread_readFF(NULL, &ret);
+		qthread_empty(&ret);
+		spawn(locale, fid, arg, arg_size, arg_tid, &ret);
+		qthread_readFF(NULL, &ret);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] end locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
 }
 
 //
@@ -633,15 +634,15 @@ void chpl_comm_fork(int locale, chpl_fn_int_t fid,
 void chpl_comm_fork_nb(int locale, chpl_fn_int_t fid,
                        void *arg, int32_t arg_size, int32_t arg_tid)
 {
-    PROFILE_INCR(profile_comm_fork_nb,1);
-    PROFILE_BIN_INCR(profile_comm_fork_nb_size,arg_size);
+		PROFILE_INCR(profile_comm_fork_nb,1);
+		PROFILE_BIN_INCR(profile_comm_fork_nb_size,arg_size);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] (non-blocking) forking fn %d with arg-size %d\n", chpl_localeID, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] (non-blocking) forking fn %d with arg-size %d\n", chpl_localeID, fid, arg_size);
 
-    spawn(locale, fid, arg, arg_size, arg_tid, NULL);
+		spawn(locale, fid, arg, arg_size, arg_tid, NULL);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] end locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
 }
 
 //
@@ -651,15 +652,15 @@ void chpl_comm_fork_nb(int locale, chpl_fn_int_t fid,
 void chpl_comm_fork_fast(int locale, chpl_fn_int_t fid, void *arg,
                          int32_t arg_size, int32_t arg_tid)
 {
-    PROFILE_INCR(profile_comm_fork_fast,1);
-    PROFILE_BIN_INCR(profile_comm_fork_fast_size,arg_size);
+		PROFILE_INCR(profile_comm_fork_fast,1);
+		PROFILE_BIN_INCR(profile_comm_fork_fast_size,arg_size);
 
-    qthread_debug(CHAPEL_CALLS, "[%d] begin locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
-    qthread_debug(CHAPEL_BEHAVIOR, "[%d] (fast) forking fn %d with arg-size %d\n", chpl_localeID, fid, arg_size);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		qthread_debug(CHAPEL_BEHAVIOR, "[%d] (fast) forking fn %d with arg-size %d\n", chpl_localeID, fid, arg_size);
 
-    chpl_comm_fork(locale, fid, arg, arg_size, arg_tid);
-    
-    qthread_debug(CHAPEL_CALLS, "[%d] end locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
+		chpl_comm_fork(locale, fid, arg, arg_size, arg_tid);
+
+		qthread_debug(CHAPEL_CALLS, "[%d] end locale=%d, fid=%d, arg_size=%d\n", chpl_localeID, locale, fid, arg_size);
 }
 
 //
@@ -672,21 +673,21 @@ void chpl_comm_fork_fast(int locale, chpl_fn_int_t fid, void *arg,
 //
 int chpl_comm_numPollingTasks(void)
 {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 
-    return 1;
+		return 1;
 }
 
 //
 // Segment info table setup helper - based on GASnet implementation
 //
 void chpl_comm_spr_help_register_global_var(int i, void * addr) {
-    qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] begin\n", chpl_localeID);
 
-    if (chpl_localeID == 0) {
-        ((void **)seginfo_table[0].addr)[i] = addr;
-    }
+		if (chpl_localeID == 0) {
+				((void **)seginfo_table[0].addr)[i] = addr;
+		}
 
-    qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
+		qthread_debug(CHAPEL_CALLS, "[%d] end\n", chpl_localeID);
 }

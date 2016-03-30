@@ -19,45 +19,45 @@
 #include "qthread_innards.h" /* for qlib */
 #include "qt_qthread_mgmt.h"
 
-ssize_t qt_pwrite(int         filedes,
+ssize_t qt_pwrite(int filedes,
                   const void *buf,
-                  size_t      nbyte,
-                  off_t       offset)
+                  size_t nbyte,
+                  off_t offset)
 {
-    qthread_t                *me  = qthread_internal_self();
-    qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
-    ssize_t                   ret;
+		qthread_t                *me  = qthread_internal_self();
+		qt_blocking_queue_node_t *job = ALLOC_SYSCALLJOB();
+		ssize_t ret;
 
-    assert(job);
-    job->next   = NULL;
-    job->thread = me;
-    job->op     = PWRITE;
-    memcpy(&job->args[0], &filedes, sizeof(int));
-    job->args[1] = (uintptr_t)buf;
-    memcpy(&job->args[2], &nbyte, sizeof(size_t));
-    memcpy(&job->args[3], &offset, sizeof(off_t));
+		assert(job);
+		job->next   = NULL;
+		job->thread = me;
+		job->op     = PWRITE;
+		memcpy(&job->args[0], &filedes, sizeof(int));
+		job->args[1] = (uintptr_t)buf;
+		memcpy(&job->args[2], &nbyte, sizeof(size_t));
+		memcpy(&job->args[3], &offset, sizeof(off_t));
 
-    assert(me->rdata);
+		assert(me->rdata);
 
-    me->rdata->blockedon.io = job;
-    me->thread_state        = QTHREAD_STATE_SYSCALL;
-    qthread_back_to_master(me);
-    ret = job->ret;
-    FREE_SYSCALLJOB(job);
-    return ret;
+		me->rdata->blockedon.io = job;
+		me->thread_state        = QTHREAD_STATE_SYSCALL;
+		qthread_back_to_master(me);
+		ret = job->ret;
+		FREE_SYSCALLJOB(job);
+		return ret;
 }
 
 #if HAVE_SYSCALL && HAVE_DECL_SYS_PWRITE
-ssize_t pwrite(int         filedes,
+ssize_t pwrite(int filedes,
                const void *buf,
-               size_t      nbyte,
-               off_t       offset)
+               size_t nbyte,
+               off_t offset)
 {
-    if (qt_blockable()) {
-        return qt_pwrite(filedes, buf, nbyte, offset);
-    } else {
-        return syscall(SYS_pwrite, filedes, buf, nbyte, offset);
-    }
+		if (qt_blockable()) {
+				return qt_pwrite(filedes, buf, nbyte, offset);
+		} else {
+				return syscall(SYS_pwrite, filedes, buf, nbyte, offset);
+		}
 }
 
 #endif /* if HAVE_SYSCALL && HAVE_DECL_SYS_PWRITE */

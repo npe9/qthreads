@@ -13,28 +13,28 @@
 
 static aligned_t say_hello(void *arg)
 {
-    int const rank = qthread_multinode_rank();
+		int const rank = qthread_multinode_rank();
 
-    iprintf("Hello from locale %03d!\n", rank);
+		iprintf("Hello from locale %03d!\n", rank);
 
-    return 0;
+		return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    CHECK_VERBOSE();
+		CHECK_VERBOSE();
 
-    qthread_f funcs[2] = {say_hello, NULL};
-    assert(spr_init(0, funcs) == SPR_OK);
+		qthread_f funcs[2] = {say_hello, NULL};
+		assert(spr_init(0, funcs) == SPR_OK);
 
-    int const size = spr_num_locales();
-    aligned_t rets[size];
+		int const size = spr_num_locales();
+		aligned_t rets[size];
 
-    for (int i = 0; i < size; i++)
-        qthread_fork_remote(say_hello, NULL, &rets[i], i, 0);
-    for (int i = 0; i < size; i++)
-        qthread_readFF(NULL, &rets[i]);
+		for (int i = 0; i < size; i++)
+				qthread_fork_remote(say_hello, NULL, &rets[i], i, 0);
+		for (int i = 0; i < size; i++)
+				qthread_readFF(NULL, &rets[i]);
 
-    return 0;
+		return 0;
 }
 

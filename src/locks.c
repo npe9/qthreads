@@ -12,12 +12,12 @@
 
 int API_FUNC qthread_lock(const aligned_t *a)
 {                      /*{{{ */
-    return qthread_readFE(NULL, a);
+		return qthread_readFE(NULL, a);
 }                      /*}}} */
 
 int API_FUNC qthread_unlock(const aligned_t *a)
 {                      /*{{{ */
-    return qthread_fill(a);
+		return qthread_fill(a);
 }                      /*}}} */
 
 /* vim:set expandtab: */

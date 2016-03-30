@@ -30,15 +30,15 @@ static aligned_t *buff = NULL;
  */
 static aligned_t producer(void *arg)
 {
-    for (unsigned int i = 0; i < numItems; ++i) {
-        const unsigned int buffInd = i % bufferSize;
-        qthread_writeEF_const(&buff[buffInd], i);
-        iprintf("producer wrote value #%u\n", i);
-    }
-    qthread_writeEF_const(&buff[numItems % bufferSize], -1);
-    iprintf("producer wrote terminus value #%"PRIu64"\n", -1);
+		for (unsigned int i = 0; i < numItems; ++i) {
+				const unsigned int buffInd = i % bufferSize;
+				qthread_writeEF_const(&buff[buffInd], i);
+				iprintf("producer wrote value #%u\n", i);
+		}
+		qthread_writeEF_const(&buff[numItems % bufferSize], -1);
+		iprintf("producer wrote terminus value #%" PRIu64 "\n", -1);
 
-    return 0;
+		return 0;
 }
 
 /*
@@ -47,14 +47,14 @@ static aligned_t producer(void *arg)
  */
 static int64_t readFromBuff(void)
 {
-    static unsigned int ind = 0;
-    saligned_t nextVal;
+		static unsigned int ind = 0;
+		saligned_t nextVal;
 
-    qthread_readFE((aligned_t*)&nextVal, &buff[ind]);
-    if (nextVal != -1) {
-        ind = (ind + 1) % bufferSize;
-    }
-    return nextVal;
+		qthread_readFE((aligned_t*)&nextVal, &buff[ind]);
+		if (nextVal != -1) {
+				ind = (ind + 1) % bufferSize;
+		}
+		return nextVal;
 }
 
 /*
@@ -63,13 +63,13 @@ static int64_t readFromBuff(void)
  */
 static aligned_t consumer(void *arg)
 {
-    int64_t buffVal;
+		int64_t buffVal;
 
-    while ((buffVal = readFromBuff()) != -1) {
-        iprintf("Consumer got: %li\n", (long)buffVal);
-    }
+		while ((buffVal = readFromBuff()) != -1) {
+				iprintf("Consumer got: %li\n", (long)buffVal);
+		}
 
-    return 0;
+		return 0;
 }
 
 /*
@@ -79,38 +79,38 @@ static aligned_t consumer(void *arg)
 int main(int argc,
          char *argv[])
 {
-    aligned_t t[2];
+		aligned_t t[2];
 
-    assert(qthread_initialize() == 0);
+		assert(qthread_initialize() == 0);
 
-    CHECK_VERBOSE();
-    NUMARG(bufferSize, "BUFFERSIZE");
-    numItems = 8 * bufferSize;
-    NUMARG(numItems, "NUMITEMS");
+		CHECK_VERBOSE();
+		NUMARG(bufferSize, "BUFFERSIZE");
+		numItems = 8 * bufferSize;
+		NUMARG(numItems, "NUMITEMS");
 
-    iprintf("%i threads...\n", qthread_num_shepherds());
+		iprintf("%i threads...\n", qthread_num_shepherds());
 
-    buff = malloc(sizeof(aligned_t) * bufferSize);
-    for (unsigned int i = 0; i < bufferSize; ++i) {
-        buff[i] = 0;
-    }
+		buff = malloc(sizeof(aligned_t) * bufferSize);
+		for (unsigned int i = 0; i < bufferSize; ++i) {
+				buff[i] = 0;
+		}
 
-    qthread_fork(consumer, NULL, &t[0]);
-    qthread_fork(producer, NULL, &t[1]);
-    qthread_readFF(NULL, &t[0]);
-    qthread_readFF(NULL, &t[1]);
+		qthread_fork(consumer, NULL, &t[0]);
+		qthread_fork(producer, NULL, &t[1]);
+		qthread_readFF(NULL, &t[0]);
+		qthread_readFF(NULL, &t[1]);
 
-    /* cleanup... unnecessary in general, but for the moment I'm tracking down
-     * errors in the FEB system, so let's clean up */
-    for (unsigned int i = 0; i < bufferSize; ++i) {
-	qthread_fill(buff + i);
-    }
+		/* cleanup... unnecessary in general, but for the moment I'm tracking down
+		 * errors in the FEB system, so let's clean up */
+		for (unsigned int i = 0; i < bufferSize; ++i) {
+				qthread_fill(buff + i);
+		}
 
-    free(buff);
+		free(buff);
 
-    iprintf("Success!\n");
+		iprintf("Success!\n");
 
-    return 0;
+		return 0;
 }
 
 /* vim:set expandtab */
